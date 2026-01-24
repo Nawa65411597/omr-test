@@ -3,16 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GradeMaster Pro (Online)</title>
+    <title>GradeMaster Pro (Ultimate)</title>
     
-    <!-- Styles -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;800&display=swap" rel="stylesheet">
-    
-    <!-- React & Babel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
-    <!-- Import Maps for Modules -->
     <script type="importmap">
     {
       "imports": {
@@ -28,37 +24,27 @@
     </script>
 
     <style>
-        body { font-family: 'Sarabun', sans-serif; touch-action: manipulation; background-color: #f3f4f6; }
+        body { font-family: 'Sarabun', sans-serif; touch-action: manipulation; background-color: #f3f4f6; color: #1f2937; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         @media print {
             .no-print { display: none !important; }
-            .print-only { display: block !important; }
-            body { background: white; }
-            #root > div { display: none; } /* Hide app UI */
+            body { background: white; color: black; }
+            #root > div { display: none; }
             #print-portal { display: block; }
         }
     </style>
 </head>
 <body>
-    <div id="root"></div>
+    <div id="root" class="bg-gray-50 min-h-screen"></div>
     <div id="print-portal"></div>
 
     <script type="text/babel" data-type="module">
-        import React, { useState, useEffect, useRef, useMemo } from 'react';
+        import React, { useState, useEffect, useRef } from 'react';
         import { createRoot } from 'react-dom/client';
         import { initializeApp } from 'firebase/app';
         import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
-        import { 
-            getFirestore, collection, addDoc, doc, updateDoc, deleteDoc, 
-            onSnapshot, query, orderBy, Timestamp, writeBatch, getDocs 
-        } from 'firebase/firestore';
-        import { 
-            LayoutDashboard, Plus, FileText, Settings, Printer, Camera, 
-            BarChart3, Users, Save, ArrowLeft, Trash2, Check, X, 
-            Search, Download, Upload, ScanLine, FileSpreadsheet, Home,
-            Grid3X3, Copy, Layers
-        } from 'lucide-react';
+        import { getFirestore, collection, addDoc, doc, updateDoc, deleteDoc, onSnapshot, query, orderBy, Timestamp, writeBatch, getDocs } from 'firebase/firestore';
+        import { LayoutDashboard, Plus, FileText, Settings, Printer, Camera, BarChart3, Users, Save, ArrowLeft, Trash2, Check, X, Search, Download, Upload, ScanLine, FileSpreadsheet, Home } from 'lucide-react';
 
         // --- Config ---
         const firebaseConfig = {
@@ -74,13 +60,13 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const appId = 'grade-master-pro'; // App Namespace
+        const appId = 'grade-master-pro';
 
         const CHOICES = ['A', 'B', 'C', 'D', 'E'];
         const EXAM_SETS = ['A', 'B', 'C', 'D'];
         const QUESTION_OPTIONS = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120];
 
-        // --- Helper Functions ---
+        // --- Core Logic ---
         const getLayoutConfig = (totalQuestions) => {
             if (totalQuestions <= 50) {
                 const mid = Math.ceil(totalQuestions / 2);
@@ -105,7 +91,7 @@
             }
         };
 
-        const analyzePaperImage = (ctx, width, height, questionCount, threshold) => {
+        const analyzePaperImage = (ctx, width, height, questionCount, threshold, drawDebug = false) => {
             const paper = { x: width * 0.05, y: height * 0.05, w: width * 0.9, h: height * 0.9 };
             const getB = (x, y) => {
                 try {
@@ -115,17 +101,27 @@
                 } catch { return 255; }
             };
 
+            const drawMark = (x, y, color) => {
+                if(drawDebug) {
+                    ctx.beginPath();
+                    ctx.arc(x, y, 3, 0, 2 * Math.PI);
+                    ctx.fillStyle = color;
+                    ctx.fill();
+                }
+            };
+
             // 1. Scan ID
             const idArea = { x: paper.x + paper.w * 0.65, y: paper.y + paper.h * 0.12, w: paper.w * 0.25, h: paper.h * 0.15 };
             let studentId = "";
             for (let c = 0; c < 5; c++) {
-                let min = 255, digit = "?";
+                let min = 255, digit = "?", bestX=0, bestY=0;
                 for (let r = 0; r < 10; r++) {
                     const bx = idArea.x + c * (idArea.w / 5) + (idArea.w / 10);
                     const by = idArea.y + r * (idArea.h / 10) + (idArea.h / 20);
                     const b = getB(bx, by);
-                    if (b < min) { min = b; if (min < threshold) digit = r.toString(); }
+                    if (b < min) { min = b; bestX=bx; bestY=by; if (min < threshold) digit = r.toString(); }
                 }
+                if(digit !== "?") drawMark(bestX, bestY, 'rgba(0,255,0,0.9)');
                 studentId += digit;
             }
 
@@ -133,16 +129,18 @@
             const setArea = { x: paper.x + paper.w * 0.45, y: paper.y + paper.h * 0.15, w: paper.w * 0.15, h: paper.h * 0.05 };
             let detectedSet = null;
             const setGap = setArea.w / 4;
-            let minSetB = 255;
+            let minSetB = 255, setX=0, setY=0;
             for(let i=0; i<4; i++) {
                 const bx = setArea.x + i*setGap + setGap/2;
                 const by = setArea.y + setArea.h/2;
                 const b = getB(bx, by);
                 if(b < minSetB) { 
                     minSetB = b; 
+                    setX=bx; setY=by;
                     if(minSetB < threshold) detectedSet = EXAM_SETS[i]; 
                 }
             }
+            if(detectedSet) drawMark(setX, setY, 'rgba(255,165,0,0.9)');
 
             // 3. Scan Questions
             const layout = getLayoutConfig(questionCount);
@@ -159,22 +157,45 @@
 
                 for(let i=0; i<count; i++) {
                     const qNum = range.start + i;
-                    let best = "-", min = 255;
+                    let best = "-", min = 255, bestX=0, bestY=0;
                     for(let c=0; c<5; c++) {
                         const bx = colX + c*gap + gap/2;
                         const by = qZoneY + i*rowH + rowH/2;
                         const b = getB(bx, by);
-                        if(b < min) { min=b; if(min < threshold) best = CHOICES[c]; }
+                        if(b < min) { min=b; bestX=bx; bestY=by; if (min < threshold) best = CHOICES[c]; }
                     }
                     answers[qNum] = best;
+                    if(best !== "-") drawMark(bestX, bestY, 'rgba(0,200,255,0.8)'); // Blue for answers
                 }
             });
 
             return { studentId, answers, detectedSet };
         };
 
-        // --- Components ---
+        // --- Viewfinder Overlay ---
+        const ScannerOverlay = () => (
+            <div className="absolute inset-0 pointer-events-none z-10 p-4">
+                <div className="w-full h-full border-[3px] border-green-400 relative rounded-lg shadow-[0_0_0_9999px_rgba(0,0,0,0.7)]">
+                    {/* Corners */}
+                    <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-green-400 -m-1"></div>
+                    <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-green-400 -m-1"></div>
+                    <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-green-400 -m-1"></div>
+                    <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-green-400 -m-1"></div>
+                    
+                    {/* Guides */}
+                    <div className="absolute top-[12%] right-[5%] w-[25%] h-[15%] border-2 border-dashed border-yellow-400/50 bg-yellow-400/10 flex items-center justify-center">
+                        <span className="text-yellow-200 text-[10px] font-bold bg-black/60 px-1 rounded">ID ZONE</span>
+                    </div>
+                    <div className="absolute top-[15%] left-[45%] w-[15%] h-[5%] border-2 border-dashed border-orange-400/50 bg-orange-400/10 flex items-center justify-center">
+                        <span className="text-orange-200 text-[8px] font-bold bg-black/60 px-1 rounded">SET</span>
+                    </div>
+                    {/* Answer Zone Hint */}
+                    <div className="absolute top-[35%] left-[5%] right-[5%] bottom-[10%] border-2 border-dashed border-blue-400/30"></div>
+                </div>
+            </div>
+        );
 
+        // --- App ---
         function App() {
             const [user, setUser] = useState(null);
             const [view, setView] = useState('home');
@@ -185,12 +206,7 @@
                 return onAuthStateChanged(auth, setUser);
             }, []);
 
-            if (!user) return (
-                <div className="h-screen flex flex-col items-center justify-center text-blue-600">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-                    <div>GradeMaster Loading...</div>
-                </div>
-            );
+            if (!user) return <div className="h-screen flex items-center justify-center text-blue-600 font-bold animate-pulse">Initializing GradeMaster...</div>;
 
             return (
                 <div className="flex flex-col min-h-screen">
@@ -200,7 +216,7 @@
                         {view === 'quiz' && selectedQuiz && <QuizWorkspace user={user} quiz={selectedQuiz} onBack={() => setView('home')} />}
                     </div>
                     {view !== 'quiz' && (
-                        <div className="fixed bottom-0 w-full bg-white border-t flex justify-around p-2 z-50">
+                        <div className="fixed bottom-0 w-full bg-white border-t flex justify-around p-2 z-50 shadow-lg">
                             <NavButton icon={<Home/>} label="หน้าหลัก" active={view === 'home'} onClick={() => setView('home')} />
                             <NavButton icon={<Users/>} label="นักเรียน" active={view === 'students'} onClick={() => setView('students')} />
                         </div>
@@ -210,7 +226,7 @@
         }
 
         const NavButton = ({icon, label, active, onClick}) => (
-            <button onClick={onClick} className={`flex flex-col items-center w-full py-1 ${active ? 'text-blue-600' : 'text-gray-400'}`}>
+            <button onClick={onClick} className={`flex flex-col items-center w-full py-2 transition-colors ${active ? 'text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}>
                 {icon} <span className="text-[10px] font-bold mt-1">{label}</span>
             </button>
         );
@@ -240,49 +256,63 @@
 
             const del = async (id, e) => {
                 e.stopPropagation();
-                if(confirm("ยืนยันลบ?")) await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'quizzes', id));
+                if(confirm("ยืนยันลบการสอบนี้?")) await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'quizzes', id));
             }
 
             return (
-                <div className="p-6 pb-20 max-w-4xl mx-auto">
-                    <div className="flex justify-between items-center mb-6">
-                        <h1 className="text-2xl font-black text-gray-800 flex gap-2"><ScanLine className="text-blue-600"/> GradeMaster</h1>
-                        <button onClick={() => setShowModal(true)} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold shadow-lg flex gap-2"><Plus size={20}/> สร้าง</button>
+                <div className="p-6 pb-24 max-w-4xl mx-auto">
+                    <div className="flex justify-between items-center mb-8">
+                        <div>
+                            <h1 className="text-3xl font-black text-gray-800 flex gap-2 items-center"><ScanLine className="text-blue-600" size={32}/> GradeMaster</h1>
+                            <p className="text-gray-500 text-sm">ระบบตรวจข้อสอบอัจฉริยะ</p>
+                        </div>
+                        <button onClick={() => setShowModal(true)} className="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-lg flex gap-2 hover:bg-blue-700 transition active:scale-95"><Plus size={20}/> สร้างใหม่</button>
                     </div>
-                    <div className="grid gap-4 md:grid-cols-2">
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                         {quizzes.map(q => (
-                            <div key={q.id} onClick={() => onSelect(q)} className="bg-white p-5 rounded-2xl shadow-sm border hover:shadow-md cursor-pointer relative group">
-                                <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-500 rounded-l-2xl"></div>
-                                <div className="ml-3">
-                                    <div className="flex justify-between">
-                                        <h3 className="font-bold text-lg">{q.name}</h3>
-                                        <button onClick={(e)=>del(q.id, e)} className="text-gray-300 hover:text-red-500"><Trash2 size={18}/></button>
+                            <div key={q.id} onClick={() => onSelect(q)} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 hover:shadow-xl cursor-pointer relative group transition-all transform hover:-translate-y-1">
+                                <div className="absolute left-0 top-0 bottom-0 w-2 bg-blue-500 rounded-l-2xl group-hover:bg-blue-600"></div>
+                                <div className="ml-4">
+                                    <div className="flex justify-between items-start">
+                                        <h3 className="font-bold text-lg text-gray-800 line-clamp-1">{q.name}</h3>
+                                        <button onClick={(e)=>del(q.id, e)} className="text-gray-300 hover:text-red-500 p-1 rounded-full hover:bg-red-50 transition"><Trash2 size={18}/></button>
                                     </div>
-                                    <div className="flex gap-3 text-sm text-gray-500 mt-2">
-                                        <span className="bg-gray-100 px-2 rounded flex items-center gap-1"><FileText size={12}/> {q.questions} ข้อ</span>
-                                        <span>{q.date?.seconds ? new Date(q.date.seconds*1000).toLocaleDateString('th-TH') : ''}</span>
+                                    <div className="flex gap-3 text-xs font-bold text-gray-500 mt-3">
+                                        <span className="bg-blue-50 text-blue-600 px-2 py-1 rounded flex items-center gap-1"><FileText size={12}/> {q.questions} ข้อ</span>
+                                        <span className="flex items-center gap-1 py-1"><ScanLine size={12}/> {q.date?.seconds ? new Date(q.date.seconds*1000).toLocaleDateString('th-TH') : ''}</span>
                                     </div>
                                 </div>
                             </div>
                         ))}
+                        {quizzes.length === 0 && (
+                            <div className="col-span-full py-16 text-center text-gray-400 bg-white rounded-2xl border-2 border-dashed">
+                                <FileText size={48} className="mx-auto mb-2 opacity-20"/>
+                                ยังไม่มีรายการสอบ
+                            </div>
+                        )}
                     </div>
                     
                     {showModal && (
-                        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-                            <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
-                                <h3 className="text-xl font-bold mb-4">สร้างการสอบใหม่</h3>
-                                <input className="w-full border p-3 rounded-lg mb-4" placeholder="ชื่อวิชา" value={name} onChange={e => setName(e.target.value)} autoFocus />
-                                <div className="mb-4">
-                                    <label className="text-xs font-bold text-gray-500 mb-2 block">จำนวนข้อ</label>
-                                    <div className="grid grid-cols-4 gap-2">
-                                        {QUESTION_OPTIONS.map(n => (
-                                            <button key={n} onClick={() => setQCount(n)} className={`py-1 rounded border text-xs font-bold ${qCount===n?'bg-blue-50 border-blue-500 text-blue-600':'bg-white text-gray-500'}`}>{n}</button>
-                                        ))}
+                        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
+                            <div className="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl animate-in fade-in zoom-in duration-200">
+                                <h3 className="text-2xl font-bold mb-6 text-gray-800">สร้างการสอบใหม่</h3>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="text-xs font-bold text-gray-500 uppercase ml-1">ชื่อวิชา</label>
+                                        <input className="w-full border-2 border-gray-100 p-3 rounded-xl focus:border-blue-500 outline-none font-bold text-lg" placeholder="เช่น วิทยาศาสตร์ ม.1" value={name} onChange={e => setName(e.target.value)} autoFocus />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-gray-500 uppercase ml-1">จำนวนข้อ</label>
+                                        <div className="grid grid-cols-4 gap-2">
+                                            {QUESTION_OPTIONS.map(n => (
+                                                <button key={n} onClick={() => setQCount(n)} className={`py-2 rounded-lg border-2 text-sm font-bold transition ${qCount===n?'bg-blue-50 border-blue-500 text-blue-600':'bg-white border-gray-100 text-gray-400 hover:border-gray-300'}`}>{n}</button>
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="flex gap-2">
-                                    <button onClick={() => setShowModal(false)} className="flex-1 py-2 bg-gray-100 rounded-lg font-bold text-gray-500">ยกเลิก</button>
-                                    <button onClick={create} className="flex-1 py-2 bg-blue-600 text-white rounded-lg font-bold">สร้าง</button>
+                                <div className="flex gap-3 mt-8">
+                                    <button onClick={() => setShowModal(false)} className="flex-1 py-3 bg-gray-100 rounded-xl font-bold text-gray-500 hover:bg-gray-200 transition">ยกเลิก</button>
+                                    <button onClick={create} className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition shadow-lg">สร้างเลย</button>
                                 </div>
                             </div>
                         </div>
@@ -303,42 +333,49 @@
 
             const importBulk = async () => {
                 const batch = writeBatch(db);
+                let count = 0;
                 bulk.split('\n').forEach(l => {
                     const p = l.trim().split(/\s+/);
                     if(p.length >= 2 && p[0].length === 5) {
                         const ref = doc(collection(db, 'artifacts', appId, 'users', user.uid, 'students'));
                         batch.set(ref, { studentId: p[0], name: p.slice(1).join(' '), classRoom: '-' });
+                        count++;
                     }
                 });
-                await batch.commit();
-                setMode('list'); setBulk("");
+                if(count > 0) {
+                    await batch.commit();
+                    alert(`เพิ่มสำเร็จ ${count} คน`);
+                    setMode('list'); setBulk("");
+                }
             }
 
             const del = async (id) => { if(confirm("ลบ?")) await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'students', id)); }
 
             return (
-                <div className="p-6 pb-20 max-w-4xl mx-auto">
+                <div className="p-6 pb-24 max-w-4xl mx-auto">
                     <div className="flex justify-between items-center mb-6">
                         <h2 className="text-2xl font-black text-gray-800">นักเรียน ({students.length})</h2>
-                        <button onClick={() => setMode('bulk')} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold flex gap-2"><Upload size={18}/> นำเข้า</button>
+                        <button onClick={() => setMode('bulk')} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold flex gap-2 hover:bg-blue-700 shadow"><Upload size={18}/> นำเข้า</button>
                     </div>
                     
                     {mode === 'bulk' && (
-                        <div className="bg-white p-4 rounded-xl shadow-lg mb-6 relative">
-                            <button onClick={()=>setMode('list')} className="absolute top-2 right-2"><X/></button>
-                            <h3 className="font-bold mb-2">นำเข้า (รหัส เว้นวรรค ชื่อ)</h3>
-                            <textarea className="w-full h-32 border p-2 rounded" value={bulk} onChange={e=>setBulk(e.target.value)}></textarea>
-                            <button onClick={importBulk} className="w-full bg-blue-600 text-white py-2 rounded mt-2 font-bold">ยืนยัน</button>
+                        <div className="bg-white p-6 rounded-2xl shadow-xl mb-6 relative animate-in slide-in-from-top-4 border border-blue-100">
+                            <button onClick={()=>setMode('list')} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X/></button>
+                            <h3 className="font-bold text-lg mb-2">นำเข้าข้อมูล (Bulk Import)</h3>
+                            <p className="text-xs text-gray-500 mb-2">รูปแบบ: รหัสนักเรียน(5หลัก) เว้นวรรค ชื่อ-นามสกุล (บรรทัดละคน)</p>
+                            <textarea className="w-full h-32 border bg-gray-50 p-3 rounded-xl font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="10001 สมชาย ใจดี&#10;10002 สมหญิง รักเรียน" value={bulk} onChange={e=>setBulk(e.target.value)}></textarea>
+                            <button onClick={importBulk} className="w-full bg-blue-600 text-white py-3 rounded-xl mt-4 font-bold hover:bg-blue-700 transition">ยืนยันการนำเข้า</button>
                         </div>
                     )}
 
-                    <div className="bg-white rounded-xl shadow overflow-hidden">
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                         {students.map(s => (
-                            <div key={s.id} className="flex justify-between p-3 border-b last:border-0 hover:bg-gray-50">
-                                <div><span className="font-mono font-bold text-blue-600 mr-3">{s.studentId}</span>{s.name}</div>
-                                <button onClick={()=>del(s.id)} className="text-gray-300 hover:text-red-500"><Trash2 size={16}/></button>
+                            <div key={s.id} className="flex justify-between p-4 border-b last:border-0 hover:bg-gray-50 transition items-center">
+                                <div><span className="font-mono font-bold text-blue-600 mr-4 bg-blue-50 px-2 py-1 rounded">{s.studentId}</span><span className="font-medium text-gray-700">{s.name}</span></div>
+                                <button onClick={()=>del(s.id)} className="text-gray-300 hover:text-red-500 p-2"><Trash2 size={18}/></button>
                             </div>
                         ))}
+                        {students.length === 0 && <div className="p-10 text-center text-gray-400">ยังไม่มีข้อมูลนักเรียน</div>}
                     </div>
                 </div>
             )
@@ -350,10 +387,10 @@
                 <div className="h-screen flex flex-col bg-gray-100 fixed inset-0 z-50">
                     <div className="bg-white px-4 py-3 shadow-sm border-b flex justify-between items-center shrink-0 z-40">
                         <div className="flex items-center gap-3">
-                            <button onClick={onBack} className="p-1 hover:bg-gray-100 rounded-full"><ArrowLeft/></button>
+                            <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full transition"><ArrowLeft className="text-gray-600"/></button>
                             <div>
-                                <div className="font-black text-lg leading-none">{quiz.name}</div>
-                                <div className="text-xs text-gray-500 mt-1">{quiz.questions} ข้อ</div>
+                                <div className="font-black text-lg leading-none text-gray-800">{quiz.name}</div>
+                                <div className="text-xs text-gray-500 mt-1 font-bold bg-gray-100 px-2 py-0.5 rounded-full w-fit">{quiz.questions} ข้อ</div>
                             </div>
                         </div>
                         <div className="hidden md:flex gap-1">
@@ -370,30 +407,31 @@
                         {tab === 'results' && <ResultsTab user={user} quiz={quiz} />}
                     </div>
                     <div className="md:hidden fixed bottom-0 w-full bg-white border-t flex justify-around p-2 pb-safe shadow-lg z-50">
-                        <MobileTabBtn id="key" icon={<Settings/>} label="เฉลย" active={tab} set={setTab} />
-                        <MobileTabBtn id="sheet" icon={<Printer/>} label="กระดาษ" active={tab} set={setTab} />
-                        <MobileTabBtn id="scan" icon={<Camera/>} label="สแกน" active={tab} set={setTab} isMain />
-                        <MobileTabBtn id="results" icon={<BarChart3/>} label="ผลสอบ" active={tab} set={setTab} />
+                        <MobileTabBtn id="key" icon={<Settings size={20}/>} label="เฉลย" active={tab} set={setTab} />
+                        <MobileTabBtn id="sheet" icon={<Printer size={20}/>} label="กระดาษ" active={tab} set={setTab} />
+                        <MobileTabBtn id="scan" icon={<Camera size={24}/>} label="สแกน" active={tab} set={setTab} isMain />
+                        <MobileTabBtn id="results" icon={<BarChart3 size={20}/>} label="ผลสอบ" active={tab} set={setTab} />
                     </div>
                 </div>
             )
         }
 
         const TabBtn = ({id, label, active, set}) => (
-            <button onClick={()=>set(id)} className={`px-4 py-2 rounded-lg text-sm font-bold ${active===id?'bg-blue-50 text-blue-600':'text-gray-500'}`}>{label}</button>
+            <button onClick={()=>set(id)} className={`px-4 py-2 rounded-lg text-sm font-bold transition ${active===id?'bg-blue-50 text-blue-600':'text-gray-500 hover:text-gray-800'}`}>{label}</button>
         );
         const MobileTabBtn = ({id, icon, label, active, set, isMain}) => (
-            <button onClick={()=>set(id)} className={`flex flex-col items-center w-full ${active?'text-blue-600':'text-gray-400'}`}>
-                {isMain ? <div className={`p-3 rounded-full -mt-6 shadow-lg border-4 border-gray-100 ${active?'bg-blue-600 text-white':'bg-white text-gray-500'}`}>{icon}</div> : icon}
+            <button onClick={()=>set(id)} className={`flex flex-col items-center w-full transition ${active?'text-blue-600':'text-gray-400'}`}>
+                {isMain ? <div className={`p-3 rounded-full -mt-8 shadow-lg border-4 border-gray-100 transition transform ${active?'bg-blue-600 text-white scale-110':'bg-white text-gray-500'}`}>{icon}</div> : icon}
                 <span className="text-[10px] font-bold mt-1">{label}</span>
             </button>
         );
 
-        // --- QUIZ TABS ---
+        // --- SUB COMPONENTS ---
 
         function KeyTab({ user, quiz }) {
             const [set, setSet] = useState('A');
             const [keys, setKeys] = useState(quiz.answerKeys || {'A':{}});
+            const [showScanner, setShowScanner] = useState(false);
             
             const updateKey = (q, val) => {
                 const newKeys = { ...keys, [set]: { ...keys[set], [q]: val } };
@@ -402,33 +440,117 @@
             
             const save = async () => {
                 await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'quizzes', quiz.id), { answerKeys: keys });
-                alert("บันทึกแล้ว");
+                // Small feedback
+                const btn = document.getElementById('save-btn');
+                if(btn) { btn.innerText = "เรียบร้อย"; setTimeout(()=>btn.innerText="บันทึก", 1000); }
             }
 
             return (
                 <div className="h-full overflow-y-auto p-4 pb-24 max-w-3xl mx-auto">
-                    <div className="flex justify-between items-center mb-4 sticky top-0 bg-gray-50 py-2 z-10">
-                        <div className="flex gap-2">
+                    <div className="flex justify-between items-center mb-6 sticky top-0 bg-gray-50 py-3 z-10">
+                        <div className="flex bg-white rounded-lg p-1 shadow-sm border">
                             {EXAM_SETS.map(s => (
-                                <button key={s} onClick={()=>setSet(s)} className={`w-8 h-8 rounded font-bold shadow ${set===s?'bg-blue-600 text-white':'bg-white text-gray-500'}`}>{s}</button>
+                                <button key={s} onClick={()=>setSet(s)} className={`w-10 h-8 rounded-md font-bold text-sm transition ${set===s?'bg-blue-600 text-white shadow':'text-gray-500 hover:bg-gray-50'}`}>ชุด {s}</button>
                             ))}
                         </div>
-                        <button onClick={save} className="bg-green-600 text-white px-6 py-1.5 rounded-lg font-bold shadow">บันทึก</button>
+                        <div className="flex gap-2">
+                            <button onClick={()=>setShowScanner(true)} className="bg-purple-600 text-white px-4 py-2 rounded-lg font-bold shadow hover:bg-purple-700 flex items-center gap-2"><Camera size={18}/> สแกน</button>
+                            <button id="save-btn" onClick={save} className="bg-green-600 text-white px-6 py-2 rounded-lg font-bold shadow hover:bg-green-700 flex items-center gap-2"><Save size={18}/> บันทึก</button>
+                        </div>
                     </div>
-                    <div className="grid grid-cols-5 gap-2">
-                        {Array.from({length: quiz.questions}, (_, i) => i+1).map(q => (
-                            <div key={q} className="bg-white p-2 rounded border text-center">
-                                <div className="text-[10px] font-bold text-gray-400">{q}</div>
-                                <select 
-                                    className={`w-full text-center font-bold outline-none ${keys[set]?.[q] ? 'text-green-600':'text-gray-300'}`}
-                                    value={keys[set]?.[q] || '-'}
-                                    onChange={(e)=>updateKey(q, e.target.value)}
-                                >
-                                    <option value="-">-</option>
-                                    {CHOICES.map(c=><option key={c} value={c}>{c}</option>)}
-                                </select>
-                            </div>
-                        ))}
+                    
+                    <div className="grid grid-cols-5 gap-3">
+                        {Array.from({length: quiz.questions}, (_, i) => i+1).map(q => {
+                            const val = keys[set]?.[q] || '-';
+                            return (
+                                <div key={q} className={`p-2 rounded-xl border text-center shadow-sm transition ${CHOICES.includes(val) ? 'bg-green-50 border-green-200' : 'bg-white border-gray-200'}`}>
+                                    <div className="text-[10px] font-bold text-gray-400 mb-1">{q}</div>
+                                    <select 
+                                        className={`w-full text-center font-bold outline-none bg-transparent cursor-pointer ${CHOICES.includes(val) ? 'text-green-700':'text-gray-400'}`}
+                                        value={val}
+                                        onChange={(e)=>updateKey(q, e.target.value)}
+                                    >
+                                        <option value="-">-</option>
+                                        {CHOICES.map(c=><option key={c} value={c}>{c}</option>)}
+                                    </select>
+                                </div>
+                            )
+                        })}
+                    </div>
+
+                    {showScanner && (
+                        <div className="fixed inset-0 z-50 bg-black">
+                            <KeyScanner 
+                                quiz={quiz} 
+                                targetSet={set} 
+                                onClose={()=>{setShowScanner(false); save();}} 
+                                onScan={(res)=>{
+                                    const newKeys = { ...keys, [set]: res };
+                                    setKeys(newKeys);
+                                }} 
+                            />
+                        </div>
+                    )}
+                </div>
+            )
+        }
+
+        // Improved KeyScanner with Visual Feedback
+        function KeyScanner({ quiz, targetSet, onClose, onScan }) {
+            const videoRef = useRef(null);
+            const canvasRef = useRef(null);
+            const [scanning, setScanning] = useState(false);
+
+            useEffect(() => {
+                navigator.mediaDevices.getUserMedia({video:{facingMode:'environment', width: {ideal: 1920}, height: {ideal: 1080}}})
+                    .then(s => { if(videoRef.current) videoRef.current.srcObject = s; })
+                    .catch(e => alert("ไม่สามารถเปิดกล้องได้"));
+            }, []);
+
+            const scan = () => {
+                if(scanning || !videoRef.current) return;
+                setScanning(true);
+                const cvs = canvasRef.current;
+                cvs.width = videoRef.current.videoWidth;
+                cvs.height = videoRef.current.videoHeight;
+                const ctx = cvs.getContext('2d');
+                ctx.drawImage(videoRef.current, 0, 0);
+
+                // Pass TRUE to draw debug dots
+                const { answers } = analyzePaperImage(ctx, cvs.width, cvs.height, quiz.questions, 110, true);
+                
+                // Show result on canvas for a moment
+                setTimeout(() => {
+                    const count = Object.values(answers).filter(v=>CHOICES.includes(v)).length;
+                    if(confirm(`สแกนเจอคำตอบ ${count} ข้อ สำหรับชุด ${targetSet}\nยืนยันการบันทึก?`)) {
+                        onScan(answers);
+                        onClose();
+                    } else {
+                        setScanning(false);
+                        ctx.clearRect(0,0,cvs.width,cvs.height); // Clear dots
+                    }
+                }, 100);
+            }
+
+            return (
+                <div className="h-full relative flex flex-col bg-black">
+                    <video ref={videoRef} autoPlay muted playsInline className="absolute inset-0 w-full h-full object-cover opacity-90" />
+                    <canvas ref={canvasRef} className="absolute inset-0 w-full h-full object-contain pointer-events-none" />
+                    
+                    <ScannerOverlay />
+
+                    <div className="absolute top-0 w-full p-4 pt-10 flex justify-between text-white z-20 bg-gradient-to-b from-black/80 to-transparent">
+                        <div>
+                            <h3 className="font-bold text-xl">สแกนเฉลยชุด {targetSet}</h3>
+                            <p className="text-xs opacity-80">จุดสีฟ้า = คำตอบที่อ่านได้</p>
+                        </div>
+                        <button onClick={onClose} className="bg-white/20 p-2 rounded-full"><X/></button>
+                    </div>
+                    
+                    <div className="absolute bottom-10 w-full flex justify-center z-20">
+                        <button onClick={scan} disabled={scanning} className="w-20 h-20 bg-white rounded-full border-4 border-purple-500 flex items-center justify-center active:scale-95 shadow-xl transition transform hover:scale-105">
+                            <div className="w-16 h-16 bg-purple-600 rounded-full border-4 border-white"></div>
+                        </button>
                     </div>
                 </div>
             )
@@ -450,11 +572,11 @@
             return (
                 <div className="h-full flex flex-col items-center bg-gray-100 p-4 pb-24 overflow-y-auto">
                     <div className="mb-4 flex gap-4 print:hidden">
-                        <div className="bg-white p-1 rounded flex">
-                            <button onClick={()=>setSize('A4')} className={`px-3 rounded ${size==='A4'?'bg-gray-200 font-bold':''}`}>A4</button>
-                            <button onClick={()=>setSize('A5')} className={`px-3 rounded ${size==='A5'?'bg-gray-200 font-bold':''}`}>A5</button>
+                        <div className="bg-white p-1 rounded-lg flex shadow-sm border">
+                            <button onClick={()=>setSize('A4')} className={`px-4 py-1 rounded-md text-sm font-bold transition ${size==='A4'?'bg-blue-100 text-blue-700':'text-gray-500'}`}>A4</button>
+                            <button onClick={()=>setSize('A5')} className={`px-4 py-1 rounded-md text-sm font-bold transition ${size==='A5'?'bg-blue-100 text-blue-700':'text-gray-500'}`}>A5</button>
                         </div>
-                        <button onClick={print} className="bg-gray-900 text-white px-4 py-1 rounded font-bold shadow flex gap-2"><Printer size={18}/> พิมพ์</button>
+                        <button onClick={print} className="bg-gray-900 text-white px-5 py-2 rounded-lg font-bold shadow hover:bg-black transition flex gap-2"><Printer size={18}/> พิมพ์</button>
                     </div>
                     
                     <div id="sheet-preview">
@@ -466,7 +588,7 @@
 
                             <div className="mx-8 mt-4 border-b-2 border-black pb-2 flex justify-between items-start">
                                 <div>
-                                    <h1 className="text-3xl font-black uppercase">ANSWER SHEET</h1>
+                                    <h1 className="text-3xl font-black uppercase tracking-tight">ANSWER SHEET</h1>
                                     <div className="mt-2 space-y-1 w-64">
                                         <div className="flex justify-between border-b border-gray-400"><span className="text-[10px] font-bold">NAME</span></div>
                                         <div className="flex justify-between border-b border-gray-400"><span className="text-[10px] font-bold">DATE</span></div>
@@ -506,6 +628,7 @@
 
         function ScannerTab({ user, quiz }) {
             const videoRef = useRef(null);
+            const canvasRef = useRef(null);
             const [result, setResult] = useState(null);
             const [scanning, setScanning] = useState(false);
             const [students, setStudents] = useState([]);
@@ -521,69 +644,74 @@
             const scan = () => {
                 if(scanning || !videoRef.current) return;
                 setScanning(true);
-                const cvs = document.createElement('canvas');
+                const cvs = canvasRef.current;
                 cvs.width = videoRef.current.videoWidth;
                 cvs.height = videoRef.current.videoHeight;
                 const ctx = cvs.getContext('2d');
                 ctx.drawImage(videoRef.current, 0, 0);
 
-                const { studentId, answers, detectedSet } = analyzePaperImage(ctx, cvs.width, cvs.height, quiz.questions, threshold);
+                // Pass true to drawDebug so we see green dots
+                const { studentId, answers, detectedSet } = analyzePaperImage(ctx, cvs.width, cvs.height, quiz.questions, threshold, true);
                 
-                // Grading
-                const examSet = detectedSet || 'A';
-                const key = quiz.answerKeys[examSet] || {};
-                let score = 0;
-                Object.keys(answers).forEach(q => { if(answers[q] === key[q]) score++; });
+                // Show feedback for a split second before result popup
+                setTimeout(() => {
+                    const examSet = detectedSet || 'A';
+                    const key = quiz.answerKeys[examSet] || {};
+                    let score = 0;
+                    Object.keys(answers).forEach(q => { if(answers[q] === key[q]) score++; });
 
-                const st = students.find(s => s.studentId === studentId);
-                setResult({ studentId, score, examSet, answers, matchedName: st ? st.name : null });
-                if(navigator.vibrate) navigator.vibrate(200);
-                setScanning(false);
+                    const st = students.find(s => s.studentId === studentId);
+                    setResult({ studentId, score, examSet, answers, matchedName: st ? st.name : null });
+                    if(navigator.vibrate) navigator.vibrate(200);
+                    setScanning(false);
+                }, 200);
             }
 
             const save = async () => {
                 await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'quizzes', quiz.id, 'results'), { ...result, timestamp: Timestamp.now() });
                 setResult(null);
+                const ctx = canvasRef.current.getContext('2d');
+                ctx.clearRect(0,0,canvasRef.current.width, canvasRef.current.height);
+            }
+
+            const cancel = () => {
+                setResult(null);
+                const ctx = canvasRef.current.getContext('2d');
+                ctx.clearRect(0,0,canvasRef.current.width, canvasRef.current.height);
             }
 
             return (
                 <div className="h-full bg-black relative flex flex-col">
                     <div className="relative flex-grow overflow-hidden">
                         <video ref={videoRef} autoPlay muted playsInline className="absolute inset-0 w-full h-full object-cover opacity-90" />
-                        <div className="absolute inset-0 pointer-events-none z-10 p-4">
-                            <div className="w-full h-full border-[20px] border-black/60 relative">
-                                <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-green-400 -m-1"></div>
-                                <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-green-400 -m-1"></div>
-                                <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-green-400 -m-1"></div>
-                                <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-green-400 -m-1"></div>
-                                <div className="absolute top-1/4 right-8 text-yellow-200 text-xs font-bold bg-black/50 px-2">ID</div>
-                                <div className="absolute top-[15%] left-[45%] text-orange-200 text-xs font-bold bg-black/50 px-2">SET</div>
-                            </div>
-                        </div>
+                        <canvas ref={canvasRef} className="absolute inset-0 w-full h-full object-contain pointer-events-none" />
+                        
+                        <ScannerOverlay />
+
                         <div className="absolute bottom-24 w-full flex flex-col items-center gap-4 z-20">
-                            <div className="bg-black/50 px-3 py-1 rounded-full text-white text-xs flex gap-2">
-                                <span>Light:</span><input type="range" min="50" max="200" value={threshold} onChange={e=>setThreshold(Number(e.target.value))} className="w-20"/>
+                            <div className="bg-black/50 px-4 py-1.5 rounded-full text-white text-xs flex gap-3 backdrop-blur shadow-lg border border-white/10">
+                                <span>ความสว่าง:</span><input type="range" min="50" max="200" value={threshold} onChange={e=>setThreshold(Number(e.target.value))} className="w-24 accent-green-500"/>
                             </div>
-                            <button onClick={scan} disabled={scanning} className="w-20 h-20 bg-white rounded-full border-4 border-gray-400 flex items-center justify-center active:scale-95 shadow-2xl">
+                            <button onClick={scan} disabled={scanning} className="w-20 h-20 bg-white rounded-full border-4 border-gray-400 flex items-center justify-center active:scale-95 shadow-2xl transition transform hover:scale-105">
                                 <div className="w-16 h-16 bg-red-600 rounded-full border-2 border-white"></div>
                             </button>
                         </div>
                     </div>
                     {result && (
-                        <div className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4">
-                            <div className="bg-white rounded-2xl w-full max-w-sm animate-in zoom-in overflow-hidden shadow-2xl">
-                                <div className={`p-6 text-center ${result.score >= quiz.questions/2 ? 'bg-green-600' : 'bg-red-600'} text-white`}>
-                                    <div className="absolute top-2 right-2 bg-white/20 px-2 rounded text-xs font-bold">Set {result.examSet}</div>
-                                    <div className="text-6xl font-black">{Math.round(result.score/quiz.questions*100)}%</div>
-                                    <div className="font-bold text-xl">{result.score} / {quiz.questions}</div>
-                                    <div className="mt-2 bg-black/20 p-2 rounded">
-                                        <div className="text-lg font-bold">{result.matchedName || 'Unknown Student'}</div>
-                                        <div className="text-xs font-mono">{result.studentId}</div>
+                        <div className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4 backdrop-blur-sm">
+                            <div className="bg-white rounded-3xl w-full max-w-sm animate-in zoom-in overflow-hidden shadow-2xl">
+                                <div className={`p-8 text-center relative ${result.score >= quiz.questions/2 ? 'bg-green-600' : 'bg-red-600'} text-white`}>
+                                    <div className="absolute top-3 right-3 bg-white/20 px-2 py-0.5 rounded text-xs font-bold border border-white/30">Set {result.examSet}</div>
+                                    <div className="text-7xl font-black tracking-tighter">{Math.round(result.score/quiz.questions*100)}%</div>
+                                    <div className="font-bold text-xl opacity-90">{result.score} / {quiz.questions} คะแนน</div>
+                                    <div className="mt-4 bg-black/20 p-3 rounded-xl border border-white/10 backdrop-blur-md">
+                                        <div className="text-lg font-bold truncate">{result.matchedName || 'ไม่พบชื่อในระบบ'}</div>
+                                        <div className="text-xs font-mono opacity-80 tracking-wider">{result.studentId}</div>
                                     </div>
                                 </div>
-                                <div className="p-4 flex gap-2">
-                                    <button onClick={()=>setResult(null)} className="flex-1 py-3 bg-gray-100 rounded font-bold text-gray-500">ยกเลิก</button>
-                                    <button onClick={save} className="flex-1 py-3 bg-blue-600 text-white rounded font-bold">บันทึก</button>
+                                <div className="p-6 flex gap-3">
+                                    <button onClick={cancel} className="flex-1 py-3 bg-gray-100 rounded-xl font-bold text-gray-500 hover:bg-gray-200 transition">ยกเลิก</button>
+                                    <button onClick={save} className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold shadow-lg hover:bg-blue-700 transition">บันทึกผล</button>
                                 </div>
                             </div>
                         </div>
@@ -608,29 +736,30 @@
             const csv = () => {
                 const head = "ID,Name,Set,Score,Max,%\n";
                 const rows = results.map(r => `${r.studentId},${students[r.studentId]?.name||'-'},${r.examSet},${r.score},${quiz.questions},${Math.round(r.score/quiz.questions*100)}`).join('\n');
-                const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([head+rows])); a.download="report.csv"; a.click();
+                const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([head+rows])); a.download=`${quiz.name}_Report.csv`; a.click();
             }
 
             return (
-                <div className="p-4 overflow-y-auto pb-24 h-full">
-                    <div className="flex justify-between mb-4">
-                        <h2 className="font-bold text-xl">ผลการสอบ ({results.length})</h2>
-                        <button onClick={csv} className="bg-green-600 text-white px-3 py-1 rounded font-bold text-sm shadow">Export CSV</button>
+                <div className="p-4 overflow-y-auto pb-24 h-full max-w-4xl mx-auto">
+                    <div className="flex justify-between items-center mb-6">
+                        <h2 className="font-bold text-xl text-gray-800">ผลการสอบ ({results.length})</h2>
+                        <button onClick={csv} className="bg-green-600 text-white px-4 py-2 rounded-xl font-bold text-sm shadow hover:bg-green-700 flex gap-2"><Download size={16}/> Export CSV</button>
                     </div>
-                    <div className="bg-white rounded-xl shadow border overflow-hidden">
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                         <table className="w-full text-sm text-left">
-                            <thead className="bg-gray-50 font-bold border-b"><tr><th className="p-3">ID</th><th className="p-3">Name</th><th className="p-3">Set</th><th className="p-3 text-right">Score</th></tr></thead>
+                            <thead className="bg-gray-50 font-bold border-b text-gray-600"><tr><th className="p-4">ID</th><th className="p-4">Name</th><th className="p-4">Set</th><th className="p-4 text-right">Score</th></tr></thead>
                             <tbody>
                                 {results.map(r => (
-                                    <tr key={r.id} className="border-b last:border-0 hover:bg-gray-50">
-                                        <td className="p-3 font-mono text-blue-600">{r.studentId}</td>
-                                        <td className="p-3">{students[r.studentId]?.name || '-'}</td>
-                                        <td className="p-3 text-gray-400 font-bold">{r.examSet}</td>
-                                        <td className="p-3 text-right font-black">{r.score}</td>
+                                    <tr key={r.id} className="border-b last:border-0 hover:bg-gray-50 transition">
+                                        <td className="p-4 font-mono text-blue-600 font-bold">{r.studentId}</td>
+                                        <td className="p-4 font-medium text-gray-700">{students[r.studentId]?.name || '-'}</td>
+                                        <td className="p-4 text-gray-400 font-bold">{r.examSet}</td>
+                                        <td className="p-4 text-right font-black text-lg">{r.score}</td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
+                        {results.length === 0 && <div className="p-10 text-center text-gray-400">ยังไม่มีข้อมูลคะแนน</div>}
                     </div>
                 </div>
             )
