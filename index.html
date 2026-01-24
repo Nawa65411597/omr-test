@@ -1,960 +1,643 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { initializeApp } from 'firebase/app';
-import { getAuth, signInAnonymously, onAuthStateChanged, User, signInWithCustomToken } from 'firebase/auth';
-import { 
-  getFirestore, collection, addDoc, doc, updateDoc, deleteDoc, 
-  onSnapshot, query, orderBy, Timestamp, writeBatch, getDocs, where 
-} from 'firebase/firestore';
-import { getAnalytics } from "firebase/analytics";
-import { 
-  LayoutDashboard, Plus, FileText, Settings, Printer, Camera, 
-  BarChart3, Users, Save, ArrowLeft, Trash2, Check, X, 
-  Search, Download, Upload, MoreHorizontal, ScanLine, FileSpreadsheet, Home,
-  Grid3X3, Copy, Layers
-} from 'lucide-react';
-
-// --- Firebase Config (User Custom) ---
-const firebaseConfig = {
-  apiKey: "AIzaSyBEFsVxwgVlIt4sqQrTRFDRSMofjlIpx3U",
-  authDomain: "omr-test-a9a6d.firebaseapp.com",
-  projectId: "omr-test-a9a6d",
-  storageBucket: "omr-test-a9a6d.firebasestorage.app",
-  messagingSenderId: "710542600974",
-  appId: "1:710542600974:web:187c4ca5d9bbbf6704855f",
-  measurementId: "G-J6BVS5029Q"
-};
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const analytics = getAnalytics(app); 
-const appId = 'grade-master-pro'; 
-
-// --- Constants ---
-const CHOICES = ['A', 'B', 'C', 'D', 'E'];
-const QUESTION_OPTIONS = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120];
-const EXAM_SETS = ['A', 'B', 'C', 'D'];
-
-// --- Types ---
-interface Student {
-    id: string;
-    studentId: string;
-    name: string;
-    classRoom: string;
-}
-
-interface Quiz {
-    id: string;
-    name: string;
-    date: any;
-    questions: number;
-    answerKeys: Record<string, Record<number, string>>;
-    threshold: number;
-}
-
-interface ScanResult {
-    id: string;
-    studentId: string;
-    score: number;
-    answers: Record<number, string>;
-    examSet: string;
-    timestamp: any;
-}
-
-// --- Helper: Layout Logic ---
-const getLayoutConfig = (totalQuestions: number) => {
-    if (totalQuestions <= 50) {
-        const mid = Math.ceil(totalQuestions / 2);
-        return {
-            cols: 2,
-            ranges: [
-                { start: 1, end: mid, x: 0.12, w: 0.35 },
-                { start: mid + 1, end: totalQuestions, x: 0.58, w: 0.35 }
-            ]
-        };
-    } else {
-        const perCol = Math.ceil(totalQuestions / 4);
-        return {
-            cols: 4,
-            ranges: [
-                { start: 1, end: perCol, x: 0.05, w: 0.20 },
-                { start: perCol + 1, end: perCol * 2, x: 0.28, w: 0.20 },
-                { start: perCol * 2 + 1, end: perCol * 3, x: 0.52, w: 0.20 },
-                { start: perCol * 3 + 1, end: totalQuestions, x: 0.75, w: 0.20 }
-            ]
-        };
-    }
-};
-
-// --- Helper: Core Analysis Logic ---
-const analyzePaperImage = (ctx: CanvasRenderingContext2D, width: number, height: number, questionCount: number, threshold: number) => {
-    const paper = { x: width * 0.05, y: height * 0.05, w: width * 0.9, h: height * 0.9 };
-    const getB = (x: number, y: number) => {
-        try {
-            const d = ctx.getImageData(x - 2, y - 2, 5, 5).data;
-            let s = 0; for (let i = 0; i < d.length; i += 4) s += (d[i] + d[i + 1] + d[i + 2]) / 3;
-            return s / (d.length / 4);
-        } catch { return 255; }
-    };
-
-    // 1. Scan ID
-    const idArea = { x: paper.x + paper.w * 0.65, y: paper.y + paper.h * 0.12, w: paper.w * 0.25, h: paper.h * 0.15 };
-    let studentId = "";
-    for (let c = 0; c < 5; c++) {
-        let min = 255, digit = "?";
-        for (let r = 0; r < 10; r++) {
-            const bx = idArea.x + c * (idArea.w / 5) + (idArea.w / 10);
-            const by = idArea.y + r * (idArea.h / 10) + (idArea.h / 20);
-            const b = getB(bx, by);
-            if (b < min) { min = b; if (min < threshold) digit = r.toString(); }
-        }
-        studentId += digit;
-    }
-
-    // 2. Scan Exam Set (Auto Detect)
-    // Positioned in middle top: x ~45%, y ~15%
-    const setArea = { x: paper.x + paper.w * 0.45, y: paper.y + paper.h * 0.15, w: paper.w * 0.15, h: paper.h * 0.05 };
-    let detectedSet = null;
-    const sets = ['A', 'B', 'C', 'D'];
-    const setGap = setArea.w / 4;
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>GradeMaster Pro (Online)</title>
     
-    let minSetB = 255;
-    for(let i=0; i<4; i++) {
-       const bx = setArea.x + i*setGap + setGap/2;
-       const by = setArea.y + setArea.h/2;
-       const b = getB(bx, by);
-       if(b < minSetB) { 
-           minSetB = b; 
-           if(minSetB < threshold) detectedSet = sets[i]; 
-       }
+    <!-- Styles -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;800&display=swap" rel="stylesheet">
+    
+    <!-- React & Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Import Maps for Modules -->
+    <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.2.0",
+        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+        "lucide-react": "https://esm.sh/lucide-react@0.292.0",
+        "firebase/app": "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js",
+        "firebase/auth": "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js",
+        "firebase/firestore": "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js",
+        "firebase/analytics": "https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js"
+      }
     }
+    </script>
 
-    // 3. Scan Questions
-    const layout = getLayoutConfig(questionCount);
-    const answers: Record<number, string> = {};
-    const qZoneY = paper.y + paper.h * 0.35;
-    const qZoneH = paper.h * 0.55;
-
-    layout.ranges.forEach(range => {
-        const colX = paper.x + (paper.w * range.x);
-        const colW = paper.w * range.w;
-        const count = range.end - range.start + 1;
-        const rowH = qZoneH / count; 
-        const gap = colW / 5;
-
-        for(let i=0; i<count; i++) {
-            const qNum = range.start + i;
-            let best = "-", min = 255;
-            for(let c=0; c<5; c++) {
-                const bx = colX + c*gap + gap/2;
-                const by = qZoneY + i*rowH + rowH/2;
-                const b = getB(bx, by);
-                if(b < min) { min=b; if(min < threshold) best = CHOICES[c]; }
-            }
-            answers[qNum] = best;
+    <style>
+        body { font-family: 'Sarabun', sans-serif; touch-action: manipulation; background-color: #f3f4f6; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        @media print {
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            body { background: white; }
+            #root > div { display: none; } /* Hide app UI */
+            #print-portal { display: block; }
         }
-    });
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <div id="print-portal"></div>
 
-    return { studentId, answers, detectedSet };
-};
+    <script type="text/babel" data-type="module">
+        import React, { useState, useEffect, useRef, useMemo } from 'react';
+        import { createRoot } from 'react-dom/client';
+        import { initializeApp } from 'firebase/app';
+        import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+        import { 
+            getFirestore, collection, addDoc, doc, updateDoc, deleteDoc, 
+            onSnapshot, query, orderBy, Timestamp, writeBatch, getDocs 
+        } from 'firebase/firestore';
+        import { 
+            LayoutDashboard, Plus, FileText, Settings, Printer, Camera, 
+            BarChart3, Users, Save, ArrowLeft, Trash2, Check, X, 
+            Search, Download, Upload, ScanLine, FileSpreadsheet, Home,
+            Grid3X3, Copy, Layers
+        } from 'lucide-react';
 
-// --- Main App ---
-export default function App() {
-    const [user, setUser] = useState<User | null>(null);
-    const [view, setView] = useState<'home' | 'students' | 'quiz-detail'>('home');
-    const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null);
+        // --- Config ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyBEFsVxwgVlIt4sqQrTRFDRSMofjlIpx3U",
+            authDomain: "omr-test-a9a6d.firebaseapp.com",
+            projectId: "omr-test-a9a6d",
+            storageBucket: "omr-test-a9a6d.firebasestorage.app",
+            messagingSenderId: "710542600974",
+            appId: "1:710542600974:web:187c4ca5d9bbbf6704855f",
+            measurementId: "G-J6BVS5029Q"
+        };
 
-    useEffect(() => {
-        const initAuth = async () => {
-            try {
-                await signInAnonymously(auth);
-            } catch (error) {
-                console.error("Auth Error", error);
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = 'grade-master-pro'; // App Namespace
+
+        const CHOICES = ['A', 'B', 'C', 'D', 'E'];
+        const EXAM_SETS = ['A', 'B', 'C', 'D'];
+        const QUESTION_OPTIONS = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 120];
+
+        // --- Helper Functions ---
+        const getLayoutConfig = (totalQuestions) => {
+            if (totalQuestions <= 50) {
+                const mid = Math.ceil(totalQuestions / 2);
+                return {
+                    cols: 2,
+                    ranges: [
+                        { start: 1, end: mid, x: 0.12, w: 0.35 },
+                        { start: mid + 1, end: totalQuestions, x: 0.58, w: 0.35 }
+                    ]
+                };
+            } else {
+                const perCol = Math.ceil(totalQuestions / 4);
+                return {
+                    cols: 4,
+                    ranges: [
+                        { start: 1, end: perCol, x: 0.05, w: 0.20 },
+                        { start: perCol + 1, end: perCol * 2, x: 0.28, w: 0.20 },
+                        { start: perCol * 2 + 1, end: perCol * 3, x: 0.52, w: 0.20 },
+                        { start: perCol * 3 + 1, end: totalQuestions, x: 0.75, w: 0.20 }
+                    ]
+                };
             }
         };
-        initAuth();
-        return onAuthStateChanged(auth, setUser);
-    }, []);
 
-    if (!user) return (
-        <div className="h-screen flex flex-col items-center justify-center bg-gray-50 text-blue-600">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-            <div className="font-bold animate-pulse">GradeMaster Loading...</div>
-        </div>
-    );
+        const analyzePaperImage = (ctx, width, height, questionCount, threshold) => {
+            const paper = { x: width * 0.05, y: height * 0.05, w: width * 0.9, h: height * 0.9 };
+            const getB = (x, y) => {
+                try {
+                    const d = ctx.getImageData(x - 2, y - 2, 5, 5).data;
+                    let s = 0; for (let i = 0; i < d.length; i += 4) s += (d[i] + d[i + 1] + d[i + 2]) / 3;
+                    return s / (d.length / 4);
+                } catch { return 255; }
+            };
 
-    const navigateToQuiz = (quiz: Quiz) => {
-        setSelectedQuiz(quiz);
-        setView('quiz-detail');
-    };
-
-    return (
-        <div className="min-h-screen bg-gray-50 font-sans text-gray-800 flex flex-col pb-16 md:pb-0">
-            <div className="flex-grow overflow-hidden">
-                {view === 'home' && <QuizList user={user} onSelect={navigateToQuiz} />}
-                {view === 'students' && <StudentManager user={user} />}
-                {view === 'quiz-detail' && selectedQuiz && (
-                    <QuizWorkspace user={user} quiz={selectedQuiz} onBack={() => { setView('home'); setSelectedQuiz(null); }} />
-                )}
-            </div>
-
-            {view !== 'quiz-detail' && (
-                <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around items-center p-2 z-50 shadow-[0_-2px_10px_rgba(0,0,0,0.05)] md:hidden">
-                    <NavButton icon={<Home size={24}/>} label="หน้าหลัก" active={view === 'home'} onClick={() => setView('home')} />
-                    <NavButton icon={<Users size={24}/>} label="นักเรียน" active={view === 'students'} onClick={() => setView('students')} />
-                </div>
-            )}
-            
-            {view !== 'quiz-detail' && (
-                <div className="hidden md:flex fixed top-0 left-0 bottom-0 w-64 bg-white border-r flex-col p-6 z-40">
-                    <div className="flex items-center gap-2 font-black text-2xl text-blue-600 mb-10">
-                        <Check className="bg-blue-100 p-1 rounded-lg w-8 h-8" /> GradeMaster
-                    </div>
-                    <nav className="space-y-2">
-                        <SidebarBtn icon={<Home/>} label="หน้าหลัก (Quizzes)" active={view === 'home'} onClick={() => setView('home')} />
-                        <SidebarBtn icon={<Users/>} label="รายชื่อนักเรียน" active={view === 'students'} onClick={() => setView('students')} />
-                    </nav>
-                </div>
-            )}
-        </div>
-    );
-}
-
-const NavButton = ({ icon, label, active, onClick }: any) => (
-    <button onClick={onClick} className={`flex flex-col items-center justify-center w-full py-1 ${active ? 'text-blue-600' : 'text-gray-400'}`}>
-        {icon}
-        <span className="text-[10px] font-bold mt-1">{label}</span>
-    </button>
-);
-
-const SidebarBtn = ({ icon, label, active, onClick }: any) => (
-    <button onClick={onClick} className={`flex items-center gap-3 w-full px-4 py-3 rounded-xl font-bold transition-all ${active ? 'bg-blue-50 text-blue-600' : 'text-gray-500 hover:bg-gray-50'}`}>
-        {icon} {label}
-    </button>
-);
-
-// --- 1. QUIZ LIST ---
-function QuizList({ user, onSelect }: { user: User, onSelect: (q: Quiz) => void }) {
-    const [quizzes, setQuizzes] = useState<Quiz[]>([]);
-    const [showModal, setShowModal] = useState(false);
-    const [newQuizName, setNewQuizName] = useState("");
-    const [qCount, setQCount] = useState(20);
-
-    useEffect(() => {
-        const q = query(collection(db, 'artifacts', appId, 'users', user.uid, 'quizzes'), orderBy('date', 'desc'));
-        return onSnapshot(q, (snap) => setQuizzes(snap.docs.map(d => {
-            const data = d.data();
-            const answerKeys = data.answerKeys || { 'A': data.answerKey || {} };
-            return { id: d.id, ...data, answerKeys } as Quiz;
-        })));
-    }, [user]);
-
-    const createQuiz = async () => {
-        if (!newQuizName) return;
-        const defaultKey: Record<number, string> = {};
-        for (let i = 1; i <= qCount; i++) defaultKey[i] = 'A';
-
-        await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'quizzes'), {
-            name: newQuizName,
-            date: Timestamp.now(),
-            questions: qCount,
-            answerKeys: { 'A': defaultKey },
-            threshold: 110
-        });
-        setShowModal(false); setNewQuizName("");
-    };
-
-    const deleteQuiz = async (id: string, e: any) => {
-        e.stopPropagation();
-        if (confirm("ยืนยันลบการสอบนี้?")) {
-            await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'quizzes', id));
-        }
-    }
-
-    return (
-        <div className="p-4 md:p-8 max-w-5xl mx-auto md:ml-64">
-            <div className="flex justify-between items-center mb-8">
-                <div>
-                    <h2 className="text-2xl font-black text-gray-800">รายการสอบล่าสุด</h2>
-                    <p className="text-gray-500 text-sm">จัดการการสอบและสแกนตรวจคำตอบ</p>
-                </div>
-                <button onClick={() => setShowModal(true)} className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-blue-200 transition transform active:scale-95">
-                    <Plus size={20} /> สร้างใหม่
-                </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {quizzes.map(q => (
-                    <div key={q.id} onClick={() => onSelect(q)} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md cursor-pointer transition group relative overflow-hidden">
-                        <div className="absolute top-0 left-0 w-1.5 h-full bg-blue-500 rounded-l-2xl"></div>
-                        <div className="flex justify-between items-start mb-3 pl-2">
-                            <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-                                {q.name.substring(0,1)}
-                            </div>
-                            <button onClick={(e) => deleteQuiz(q.id, e)} className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-full transition"><Trash2 size={16} /></button>
-                        </div>
-                        <div className="pl-2">
-                            <h3 className="font-bold text-lg text-gray-800 leading-tight mb-1 truncate">{q.name}</h3>
-                            <div className="flex items-center gap-3 text-xs text-gray-500">
-                                <span className="bg-gray-100 px-2 py-1 rounded flex items-center gap-1"><FileText size={12} /> {q.questions} ข้อ</span>
-                                <span className="flex items-center gap-1"><ScanLine size={12} /> {new Date(q.date.seconds * 1000).toLocaleDateString('th-TH')}</span>
-                            </div>
-                        </div>
-                    </div>
-                ))}
-                {quizzes.length === 0 && (
-                    <div className="col-span-full py-16 text-center border-2 border-dashed border-gray-200 rounded-2xl bg-gray-50/50">
-                        <div className="bg-white w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm text-gray-300">
-                            <FileText size={32}/>
-                        </div>
-                        <p className="text-gray-500 font-bold">ยังไม่มีรายการสอบ</p>
-                        <button onClick={() => setShowModal(true)} className="text-blue-600 text-sm font-bold mt-2 hover:underline">สร้างการสอบแรกของคุณเลย</button>
-                    </div>
-                )}
-            </div>
-
-            {showModal && (
-                <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-                    <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in duration-200">
-                        <h3 className="font-bold text-xl mb-6 text-center">สร้างการสอบใหม่</h3>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="text-xs font-bold text-gray-500 uppercase ml-1">ชื่อวิชา</label>
-                                <input className="w-full border-2 border-gray-100 p-3 rounded-xl focus:border-blue-500 outline-none font-bold text-gray-700 bg-gray-50 focus:bg-white transition" placeholder="เช่น วิทย์ ม.1" value={newQuizName} onChange={e => setNewQuizName(e.target.value)} autoFocus />
-                            </div>
-                            <div>
-                                <label className="text-xs font-bold text-gray-500 uppercase ml-1">จำนวนข้อสอบ</label>
-                                <div className="grid grid-cols-4 gap-2">
-                                    {QUESTION_OPTIONS.map(num => (
-                                        <button key={num} onClick={() => setQCount(num)} className={`py-2 rounded-lg text-sm font-bold border-2 transition ${qCount === num ? 'bg-blue-50 border-blue-500 text-blue-600' : 'bg-white border-gray-100 text-gray-400 hover:border-gray-300'}`}>
-                                            {num}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                        <div className="flex gap-3 mt-8">
-                            <button onClick={() => setShowModal(false)} className="flex-1 py-3 bg-gray-100 rounded-xl font-bold text-gray-500 hover:bg-gray-200">ยกเลิก</button>
-                            <button onClick={createQuiz} className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold shadow-lg hover:bg-blue-700">สร้างเลย</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-}
-
-// --- 2. STUDENT MANAGER ---
-function StudentManager({ user }: { user: User }) {
-    const [students, setStudents] = useState<Student[]>([]);
-    const [mode, setMode] = useState<'list'|'add'|'bulk'>('list');
-    const [newId, setNewId] = useState("");
-    const [newName, setNewName] = useState("");
-    const [bulkData, setBulkData] = useState("");
-
-    useEffect(() => {
-        const q = query(collection(db, 'artifacts', appId, 'users', user.uid, 'students'), orderBy('studentId'));
-        return onSnapshot(q, (snap) => setStudents(snap.docs.map(d => ({ id: d.id, ...d.data() } as Student))));
-    }, [user]);
-
-    const addStudent = async () => {
-        if(!newId || !newName) return;
-        await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'students'), { studentId: newId, name: newName, classRoom: '-' });
-        setMode('list'); setNewId(""); setNewName("");
-    }
-    const bulkImport = async () => {
-        const lines = bulkData.split('\n');
-        const batch = writeBatch(db);
-        let count = 0;
-        lines.forEach(l => {
-            const p = l.trim().split(/\s+/);
-            if(p.length>=2 && p[0].length===5) {
-                batch.set(doc(collection(db, 'artifacts', appId, 'users', user.uid, 'students')), { studentId: p[0], name: p.slice(1).join(' '), classRoom: '-' });
-                count++;
+            // 1. Scan ID
+            const idArea = { x: paper.x + paper.w * 0.65, y: paper.y + paper.h * 0.12, w: paper.w * 0.25, h: paper.h * 0.15 };
+            let studentId = "";
+            for (let c = 0; c < 5; c++) {
+                let min = 255, digit = "?";
+                for (let r = 0; r < 10; r++) {
+                    const bx = idArea.x + c * (idArea.w / 5) + (idArea.w / 10);
+                    const by = idArea.y + r * (idArea.h / 10) + (idArea.h / 20);
+                    const b = getB(bx, by);
+                    if (b < min) { min = b; if (min < threshold) digit = r.toString(); }
+                }
+                studentId += digit;
             }
-        });
-        if(count>0) await batch.commit();
-        setMode('list'); setBulkData("");
-    }
-    const deleteStudent = async (id:string) => { if(confirm("ลบ?")) await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'students', id)); }
 
-    return (
-        <div className="p-4 md:p-8 max-w-5xl mx-auto md:ml-64 h-[calc(100vh-60px)] flex flex-col">
-            <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-black text-gray-800">ฐานข้อมูลนักเรียน</h2>
-                <div className="flex gap-2">
-                    <button onClick={() => setMode('bulk')} className="bg-white border px-4 py-2 rounded-xl font-bold flex gap-2 hover:bg-gray-50"><Upload size={18}/> Bulk</button>
-                    <button onClick={() => setMode('add')} className="bg-blue-600 text-white px-4 py-2 rounded-xl font-bold flex gap-2"><Plus size={18}/> เพิ่ม</button>
-                </div>
-            </div>
-            {mode === 'bulk' && (
-                <div className="bg-white p-6 rounded-2xl shadow-xl mb-6">
-                    <div className="flex justify-between mb-4"><h3 className="font-bold">นำเข้า (รหัส เว้นวรรค ชื่อ)</h3><button onClick={()=>setMode('list')}><X/></button></div>
-                    <textarea className="w-full h-32 border bg-gray-50 p-3 rounded-xl" value={bulkData} onChange={e=>setBulkData(e.target.value)}></textarea>
-                    <button onClick={bulkImport} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold mt-4">ยืนยัน</button>
-                </div>
-            )}
-            {mode === 'add' && (
-                <div className="bg-blue-50 p-4 rounded-2xl mb-6 flex gap-3">
-                    <input className="flex-1 border p-2 rounded-lg" placeholder="รหัส" value={newId} onChange={e=>setNewId(e.target.value)}/>
-                    <input className="flex-[2] border p-2 rounded-lg" placeholder="ชื่อ" value={newName} onChange={e=>setNewName(e.target.value)}/>
-                    <button onClick={addStudent} className="px-6 bg-blue-600 text-white rounded-lg font-bold">บันทึก</button>
-                </div>
-            )}
-            <div className="bg-white rounded-2xl shadow-sm border overflow-auto">
-                <table className="w-full text-sm text-left">
-                    <thead className="bg-gray-50 font-bold border-b"><tr><th className="px-6 py-4">ID</th><th className="px-6 py-4">Name</th><th className="px-6 py-4 text-right">Action</th></tr></thead>
-                    <tbody>{students.map(s=>(<tr key={s.id} className="border-b"><td className="px-6 py-3 font-mono text-blue-600">{s.studentId}</td><td className="px-6 py-3 font-bold">{s.name}</td><td className="px-6 py-3 text-right"><button onClick={()=>deleteStudent(s.id)} className="text-gray-400 hover:text-red-500"><Trash2 size={16}/></button></td></tr>))}</tbody>
-                </table>
-            </div>
-        </div>
-    );
-}
+            // 2. Scan Set
+            const setArea = { x: paper.x + paper.w * 0.45, y: paper.y + paper.h * 0.15, w: paper.w * 0.15, h: paper.h * 0.05 };
+            let detectedSet = null;
+            const setGap = setArea.w / 4;
+            let minSetB = 255;
+            for(let i=0; i<4; i++) {
+                const bx = setArea.x + i*setGap + setGap/2;
+                const by = setArea.y + setArea.h/2;
+                const b = getB(bx, by);
+                if(b < minSetB) { 
+                    minSetB = b; 
+                    if(minSetB < threshold) detectedSet = EXAM_SETS[i]; 
+                }
+            }
 
-// --- 3. QUIZ WORKSPACE ---
-function QuizWorkspace({ user, quiz, onBack }: { user: User, quiz: Quiz, onBack: () => void }) {
-    const [tab, setTab] = useState<'scan' | 'key' | 'results' | 'sheet'>('scan');
+            // 3. Scan Questions
+            const layout = getLayoutConfig(questionCount);
+            const answers = {};
+            const qZoneY = paper.y + paper.h * 0.35;
+            const qZoneH = paper.h * 0.55;
 
-    return (
-        <div className="h-screen flex flex-col bg-gray-100 fixed inset-0 z-50">
-            <div className="bg-white px-4 py-3 shadow-sm border-b flex justify-between items-center shrink-0 z-40">
-                <div className="flex items-center gap-3">
-                    <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full text-gray-600"><ArrowLeft size={24} /></button>
-                    <div>
-                        <div className="font-black text-lg text-gray-800 leading-none">{quiz.name}</div>
-                        <div className="text-xs text-gray-500 mt-1 font-bold bg-gray-100 px-2 py-0.5 rounded-full inline-block">{quiz.questions} ข้อ</div>
-                    </div>
-                </div>
-                <div className="hidden md:flex bg-gray-100 p-1 rounded-xl">
-                    <TabBtn id="key" label="เฉลย" icon={<Settings size={16} />} active={tab} set={setTab} />
-                    <TabBtn id="sheet" label="กระดาษ" icon={<Printer size={16} />} active={tab} set={setTab} />
-                    <TabBtn id="scan" label="สแกน" icon={<Camera size={16} />} active={tab} set={setTab} />
-                    <TabBtn id="results" label="ผลสอบ" icon={<FileSpreadsheet size={16} />} active={tab} set={setTab} />
-                </div>
-            </div>
-            <div className="flex-grow overflow-hidden relative bg-gray-50">
-                {tab === 'key' && <EditKeyTab user={user} quiz={quiz} />}
-                {tab === 'sheet' && <SheetTab quiz={quiz} />}
-                {tab === 'scan' && <ScannerTab user={user} quiz={quiz} />}
-                {tab === 'results' && <ResultsTab user={user} quiz={quiz} />}
-            </div>
-            <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t flex justify-around p-2 pb-safe shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
-                <MobileTabBtn id="key" label="เฉลย" icon={<Settings size={20}/>} active={tab} set={setTab} />
-                <MobileTabBtn id="sheet" label="กระดาษ" icon={<Printer size={20}/>} active={tab} set={setTab} />
-                <MobileTabBtn id="scan" label="สแกน" icon={<Camera size={20}/>} active={tab} set={setTab} isMain />
-                <MobileTabBtn id="results" label="ผลสอบ" icon={<BarChart3 size={20}/>} active={tab} set={setTab} />
-            </div>
-        </div>
-    );
-}
+            layout.ranges.forEach(range => {
+                const colX = paper.x + (paper.w * range.x);
+                const colW = paper.w * range.w;
+                const count = range.end - range.start + 1;
+                const rowH = qZoneH / count; 
+                const gap = colW / 5;
 
-const TabBtn = ({ id, label, icon, active, set }: any) => (<button onClick={() => set(id)} className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition ${active === id ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}>{icon} {label}</button>);
-const MobileTabBtn = ({ id, label, icon, active, set, isMain }: any) => (<button onClick={() => set(id)} className={`flex flex-col items-center justify-center w-full py-1 ${active ? 'text-blue-600' : 'text-gray-400'}`}>{isMain ? (<div className={`p-3 rounded-full mb-1 ${active ? 'bg-blue-600 text-white shadow-lg' : 'bg-gray-100 text-gray-500'}`}>{icon}</div>) : icon}{!isMain && <span className="text-[10px] font-bold mt-1">{label}</span>}</button>);
-
-// --- TAB: EDIT KEY ---
-function EditKeyTab({ user, quiz }: { user: User, quiz: Quiz }) {
-    const [currentSet, setCurrentSet] = useState('A');
-    const [keys, setKeys] = useState(quiz.answerKeys || { 'A': {} });
-    const [saving, setSaving] = useState(false);
-    const [showKeyScanner, setShowKeyScanner] = useState(false);
-
-    const updateKey = (q: number, val: string) => {
-        setKeys(prev => ({
-            ...prev,
-            [currentSet]: { ...prev[currentSet], [q]: val }
-        }));
-    };
-
-    const save = async () => {
-        setSaving(true);
-        await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'quizzes', quiz.id), { answerKeys: keys });
-        setTimeout(() => setSaving(false), 500);
-    };
-
-    const handleKeyScan = (scannedAnswers: Record<number, string>) => {
-        setKeys(prev => ({
-            ...prev,
-            [currentSet]: scannedAnswers
-        }));
-        setShowKeyScanner(false);
-        save();
-    };
-
-    return (
-        <div className="h-full overflow-y-auto p-4 pb-24 max-w-3xl mx-auto">
-            <div className="bg-white p-4 rounded-xl shadow-sm border mb-4 sticky top-0 z-10">
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-bold text-gray-700 text-lg">เฉลยคำตอบ</h3>
-                    <div className="flex gap-2">
-                        <button onClick={() => setShowKeyScanner(true)} className="bg-purple-600 text-white px-4 py-2 rounded-lg font-bold shadow hover:bg-purple-700 flex items-center gap-2">
-                            <Camera size={18}/> สแกนเฉลย
-                        </button>
-                        <button onClick={save} className="bg-green-600 text-white px-6 py-2 rounded-lg font-bold shadow hover:bg-green-700 flex items-center gap-2">
-                            <Save size={18} /> {saving ? '...' : 'บันทึก'}
-                        </button>
-                    </div>
-                </div>
-                
-                <div className="flex gap-2 bg-gray-100 p-1 rounded-lg">
-                    {EXAM_SETS.map(s => (
-                        <button 
-                            key={s} 
-                            onClick={() => setCurrentSet(s)} 
-                            className={`flex-1 py-1.5 rounded-md font-bold text-sm transition ${currentSet === s ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'}`}
-                        >
-                            ชุด {s}
-                        </button>
-                    ))}
-                </div>
-            </div>
-
-            <div className="grid grid-cols-5 gap-3">
-                {Array.from({ length: quiz.questions }, (_, i) => i + 1).map(q => {
-                    const val = keys[currentSet]?.[q] || '-';
-                    return (
-                        <div key={q} className="bg-white p-2 rounded-xl border text-center shadow-sm">
-                            <div className="text-[10px] font-bold text-gray-400 mb-1">{q}</div>
-                            <select
-                                value={val}
-                                onChange={(e) => updateKey(q, e.target.value)}
-                                className={`w-full font-bold text-center border-none rounded p-1 cursor-pointer outline-none appearance-none ${CHOICES.includes(val) ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}
-                            >
-                                <option value="-">-</option>
-                                {CHOICES.map(c => <option key={c} value={c}>{c}</option>)}
-                            </select>
-                        </div>
-                    )
-                })}
-            </div>
-
-            {showKeyScanner && (
-                <div className="fixed inset-0 z-50 bg-black">
-                    <KeyScanner 
-                        questionCount={quiz.questions} 
-                        onScan={handleKeyScan} 
-                        onClose={() => setShowKeyScanner(false)} 
-                        setLabel={currentSet}
-                    />
-                </div>
-            )}
-        </div>
-    );
-}
-
-// --- SUB-COMPONENT: KEY SCANNER ---
-function KeyScanner({ questionCount, onScan, onClose, setLabel }: any) {
-    const videoRef = useRef<HTMLVideoElement>(null);
-    const canvasRef = useRef<HTMLCanvasElement>(null);
-    const [processing, setProcessing] = useState(false);
-
-    useEffect(() => {
-        let stream: MediaStream;
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } } })
-            .then(s => { if (videoRef.current) videoRef.current.srcObject = s; stream = s; })
-            .catch(e => alert("Camera Error"));
-        return () => stream?.getTracks().forEach(t => t.stop());
-    }, []);
-
-    const capture = () => {
-        if (!videoRef.current || !canvasRef.current || processing) return;
-        setProcessing(true);
-        const ctx = canvasRef.current.getContext('2d');
-        if(!ctx) return;
-        
-        const vid = videoRef.current;
-        canvasRef.current.width = vid.videoWidth;
-        canvasRef.current.height = vid.videoHeight;
-        ctx.drawImage(vid, 0, 0);
-
-        const { answers } = analyzePaperImage(ctx, vid.videoWidth, vid.videoHeight, questionCount, 110);
-        
-        const filledCount = Object.values(answers).filter(v => CHOICES.includes(v)).length;
-        if(confirm(`พบคำตอบ ${filledCount} ข้อ สำหรับชุด ${setLabel}\nยืนยันการใช้เป็นเฉลย?`)) {
-            onScan(answers);
-        } else {
-            setProcessing(false);
-        }
-    };
-
-    return (
-        <div className="h-full relative flex flex-col">
-            <video ref={videoRef} autoPlay muted playsInline className="absolute inset-0 w-full h-full object-cover" />
-            <canvas ref={canvasRef} className="hidden" />
-            
-            <div className="absolute top-0 left-0 right-0 p-4 bg-gradient-to-b from-black/80 to-transparent text-white flex justify-between items-start z-10">
-                <div>
-                    <h3 className="font-bold text-xl">สแกนเฉลย (ชุด {setLabel})</h3>
-                    <p className="text-xs opacity-80">ฝนกระดาษคำตอบให้ครบแล้วสแกน</p>
-                </div>
-                <button onClick={onClose}><X size={24}/></button>
-            </div>
-
-            <div className="absolute inset-0 pointer-events-none z-0 border-[30px] border-black/50">
-                <div className="w-full h-full border-2 border-purple-400 relative">
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-white/50 text-sm font-bold">เล็งให้ตรงกรอบ</div>
-                </div>
-            </div>
-
-            <div className="absolute bottom-10 left-0 right-0 flex justify-center z-10">
-                <button onClick={capture} disabled={processing} className="w-20 h-20 bg-white rounded-full border-4 border-purple-500 flex items-center justify-center active:scale-95 transition">
-                    <div className="w-16 h-16 bg-purple-600 rounded-full border-2 border-white"></div>
-                </button>
-            </div>
-        </div>
-    )
-}
-
-// --- TAB: SHEET ---
-function SheetTab({ quiz }: { quiz: Quiz }) {
-    const [paperSize, setPaperSize] = useState<'A4' | 'A5'>('A4');
-    const layout = getLayoutConfig(quiz.questions);
-    const paperStyle = paperSize === 'A4' ? { width: '210mm', minHeight: '297mm' } : { width: '148mm', minHeight: '210mm' };
-
-    return (
-        <div className="h-full flex flex-col items-center bg-gray-100 p-4 md:p-8 overflow-y-auto pb-24">
-            <div className="mb-6 print:hidden w-full max-w-[210mm] flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border">
-                <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-gray-600">กระดาษ:</span>
-                    <button onClick={() => setPaperSize('A4')} className={`px-2 py-1 rounded text-xs font-bold border ${paperSize==='A4'?'bg-blue-100 border-blue-500':'bg-white'}`}>A4</button>
-                    <button onClick={() => setPaperSize('A5')} className={`px-2 py-1 rounded text-xs font-bold border ${paperSize==='A5'?'bg-blue-100 border-blue-500':'bg-white'}`}>A5</button>
-                </div>
-                <button onClick={() => window.print()} className="bg-gray-900 text-white px-4 py-2 rounded-lg font-bold shadow flex gap-2"><Printer size={16} /> พิมพ์</button>
-            </div>
-            
-            <div style={paperStyle} className={`bg-white shadow-xl p-8 relative print:shadow-none print:m-0 box-border mx-auto print:w-full`}>
-                {/* Markers */}
-                <div className="absolute top-6 left-6 w-5 h-5 bg-black"></div>
-                <div className="absolute top-6 right-6 w-5 h-5 bg-black"></div>
-                <div className="absolute bottom-6 left-6 w-5 h-5 bg-black"></div>
-                <div className="absolute bottom-6 right-6 w-5 h-5 bg-black"></div>
-
-                {/* Header */}
-                <div className="mx-8 mt-4 border-b-2 border-black pb-2 flex justify-between items-start">
-                    <div>
-                        <h1 className="text-3xl font-black tracking-tight uppercase">Answer Sheet</h1>
-                        <div className="mt-2 space-y-1 w-64">
-                            <div className="flex justify-between border-b border-gray-400"><span className="text-[10px] font-bold">NAME</span></div>
-                            <div className="flex justify-between border-b border-gray-400"><span className="text-[10px] font-bold">DATE</span></div>
-                        </div>
-                        
-                        {/* New: Exam Set Bubble Area */}
-                        <div className="mt-3 flex items-center gap-2 border border-black p-1 rounded bg-gray-50 w-fit">
-                            <span className="text-[9px] font-bold">TEST FORM:</span>
-                            {EXAM_SETS.map(s => (
-                                <div key={s} className="w-5 h-5 rounded-full border border-black flex items-center justify-center text-[9px] font-bold bg-white text-gray-400">{s}</div>
-                            ))}
-                        </div>
-                    </div>
-                    <div className="border border-black p-2">
-                        <div className="text-[10px] font-black text-center mb-1">STUDENT ID</div>
-                        <div className="grid grid-cols-5 gap-1">
-                            {Array.from({ length: 10 }, (_, r) => (
-                                <React.Fragment key={r}>
-                                    {Array.from({ length: 5 }).map((_, c) => (
-                                        <div key={`${c}-${r}`} className="w-4 h-4 rounded-full border border-gray-400 flex items-center justify-center text-[8px] text-gray-400">{r}</div>
-                                    ))}
-                                </React.Fragment>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Questions */}
-                <div className="mx-8 mt-6 flex justify-between gap-8">
-                    {layout.ranges.map((range, idx) => (
-                        <div key={idx} className="flex-1">
-                            {Array.from({ length: range.end - range.start + 1 }, (_, i) => range.start + i).map(q => (
-                                <div key={q} className="flex items-center gap-2 mb-1">
-                                    <span className="font-bold w-5 text-right font-mono text-[10px]">{q}</span>
-                                    <div className="flex gap-1.5">
-                                        {CHOICES.map(c => <div key={c} className="w-5 h-5 rounded-full border border-gray-600 flex items-center justify-center text-[8px] font-bold text-gray-300">{c}</div>)}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    ))}
-                </div>
-            </div>
-        </div>
-    );
-}
-
-// --- TAB: SCANNER ---
-function ScannerTab({ user, quiz }: { user: User, quiz: Quiz }) {
-    const videoRef = useRef<HTMLVideoElement>(null);
-    const canvasRef = useRef<HTMLCanvasElement>(null);
-    const [scanning, setScanning] = useState(false);
-    const [result, setResult] = useState<ScanResult | null>(null);
-    const [matchedStudent, setMatchedStudent] = useState<Student | null>(null);
-    const [students, setStudents] = useState<Student[]>([]);
-    const [threshold, setThreshold] = useState(quiz.threshold || 110);
-    const [debug, setDebug] = useState(false);
-    const [gradingSet, setGradingSet] = useState('A'); 
-
-    useEffect(() => {
-        const q = query(collection(db, 'artifacts', appId, 'users', user.uid, 'students'));
-        getDocs(q).then(snap => setStudents(snap.docs.map(d => ({ id: d.id, ...d.data() } as Student))));
-    }, []);
-
-    useEffect(() => {
-        let stream: MediaStream;
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } } })
-            .then(s => { if (videoRef.current) videoRef.current.srcObject = s; stream = s; })
-            .catch(e => console.error(e));
-        return () => stream?.getTracks().forEach(t => t.stop());
-    }, []);
-
-    const scan = () => {
-        if (!videoRef.current || !canvasRef.current || scanning) return;
-        setScanning(true);
-        const ctx = canvasRef.current.getContext('2d');
-        if (!ctx) return;
-
-        const vid = videoRef.current;
-        canvasRef.current.width = vid.videoWidth;
-        canvasRef.current.height = vid.videoHeight;
-        ctx.drawImage(vid, 0, 0);
-
-        // Core Analysis with Auto-Detect Set
-        const { studentId, answers, detectedSet } = analyzePaperImage(ctx, vid.videoWidth, vid.videoHeight, quiz.questions, threshold);
-
-        if (!debug) {
-            // Determine set: Use detected if found, else fallback to manual state
-            const finalSet = detectedSet || gradingSet;
-            
-            // Grading logic
-            let score = 0;
-            const correctKey = quiz.answerKeys[finalSet] || {};
-            
-            Object.keys(answers).forEach(qStr => {
-                const q = Number(qStr);
-                if (answers[q] === correctKey[q]) score++;
+                for(let i=0; i<count; i++) {
+                    const qNum = range.start + i;
+                    let best = "-", min = 255;
+                    for(let c=0; c<5; c++) {
+                        const bx = colX + c*gap + gap/2;
+                        const by = qZoneY + i*rowH + rowH/2;
+                        const b = getB(bx, by);
+                        if(b < min) { min=b; if(min < threshold) best = CHOICES[c]; }
+                    }
+                    answers[qNum] = best;
+                }
             });
 
-            const st = students.find(s => s.studentId === studentId);
-            setMatchedStudent(st || null);
-            setResult({ id: '', studentId, score, answers, examSet: finalSet, timestamp: new Date() });
-            if (navigator.vibrate) navigator.vibrate(200); 
+            return { studentId, answers, detectedSet };
+        };
+
+        // --- Components ---
+
+        function App() {
+            const [user, setUser] = useState(null);
+            const [view, setView] = useState('home');
+            const [selectedQuiz, setSelectedQuiz] = useState(null);
+
+            useEffect(() => {
+                signInAnonymously(auth).catch(console.error);
+                return onAuthStateChanged(auth, setUser);
+            }, []);
+
+            if (!user) return (
+                <div className="h-screen flex flex-col items-center justify-center text-blue-600">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+                    <div>GradeMaster Loading...</div>
+                </div>
+            );
+
+            return (
+                <div className="flex flex-col min-h-screen">
+                    <div className="flex-grow">
+                        {view === 'home' && <HomeView user={user} onSelect={(q) => { setSelectedQuiz(q); setView('quiz'); }} />}
+                        {view === 'students' && <StudentView user={user} />}
+                        {view === 'quiz' && selectedQuiz && <QuizWorkspace user={user} quiz={selectedQuiz} onBack={() => setView('home')} />}
+                    </div>
+                    {view !== 'quiz' && (
+                        <div className="fixed bottom-0 w-full bg-white border-t flex justify-around p-2 z-50">
+                            <NavButton icon={<Home/>} label="หน้าหลัก" active={view === 'home'} onClick={() => setView('home')} />
+                            <NavButton icon={<Users/>} label="นักเรียน" active={view === 'students'} onClick={() => setView('students')} />
+                        </div>
+                    )}
+                </div>
+            );
         }
-        setScanning(false);
-    };
 
-    const save = async () => {
-        if (!result) return;
-        await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'quizzes', quiz.id, 'results'), {
-            ...result, timestamp: Timestamp.now()
-        });
-        setResult(null); setMatchedStudent(null);
-    };
+        const NavButton = ({icon, label, active, onClick}) => (
+            <button onClick={onClick} className={`flex flex-col items-center w-full py-1 ${active ? 'text-blue-600' : 'text-gray-400'}`}>
+                {icon} <span className="text-[10px] font-bold mt-1">{label}</span>
+            </button>
+        );
 
-    return (
-        <div className="h-full bg-black relative flex flex-col">
-            <div className="relative flex-grow overflow-hidden">
-                <video ref={videoRef} autoPlay muted playsInline className="absolute inset-0 w-full h-full object-cover opacity-90" />
-                <canvas ref={canvasRef} className={`absolute inset-0 w-full h-full object-contain pointer-events-none ${debug ? 'opacity-100' : 'opacity-0'}`} />
+        function HomeView({ user, onSelect }) {
+            const [quizzes, setQuizzes] = useState([]);
+            const [showModal, setShowModal] = useState(false);
+            const [name, setName] = useState("");
+            const [qCount, setQCount] = useState(20);
 
-                {/* Viewfinder Overlay */}
-                <div className="absolute inset-0 pointer-events-none z-10">
-                    <div className="w-full h-full border-[20px] border-black/60 relative">
-                        {/* Markers & Guides */}
-                        <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-green-400 m-4 rounded-tl"></div>
-                        <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-green-400 m-4 rounded-tr"></div>
-                        <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-green-400 m-4 rounded-bl"></div>
-                        <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-green-400 m-4 rounded-br"></div>
-                        <div className="absolute top-[12%] right-[10%] bg-yellow-400/20 px-2 py-1 rounded border border-yellow-400/50">
-                            <span className="text-yellow-200 text-[10px] font-bold">ID ZONE</span>
-                        </div>
-                        {/* New Set Zone Guide */}
-                        <div className="absolute top-[15%] left-[45%] w-[15%] h-[5%] border border-orange-400/50 bg-orange-400/10 flex items-center justify-center rounded">
-                            <span className="text-orange-200 text-[8px] font-bold bg-black/40 px-1">SET</span>
-                        </div>
+            useEffect(() => {
+                const q = query(collection(db, 'artifacts', appId, 'users', user.uid, 'quizzes'), orderBy('date', 'desc'));
+                return onSnapshot(q, (snap) => setQuizzes(snap.docs.map(d => {
+                    const data = d.data();
+                    const answerKeys = data.answerKeys || { 'A': data.answerKey || {} };
+                    return { id: d.id, ...data, answerKeys };
+                })));
+            }, [user]);
+
+            const create = async () => {
+                if(!name) return;
+                await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'quizzes'), {
+                    name, date: Timestamp.now(), questions: qCount, answerKeys: {'A':{}}, threshold: 110
+                });
+                setShowModal(false); setName("");
+            };
+
+            const del = async (id, e) => {
+                e.stopPropagation();
+                if(confirm("ยืนยันลบ?")) await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'quizzes', id));
+            }
+
+            return (
+                <div className="p-6 pb-20 max-w-4xl mx-auto">
+                    <div className="flex justify-between items-center mb-6">
+                        <h1 className="text-2xl font-black text-gray-800 flex gap-2"><ScanLine className="text-blue-600"/> GradeMaster</h1>
+                        <button onClick={() => setShowModal(true)} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold shadow-lg flex gap-2"><Plus size={20}/> สร้าง</button>
                     </div>
-                </div>
-
-                {/* Controls */}
-                <div className="absolute bottom-6 w-full flex flex-col justify-center items-center gap-4 z-20 pb-16 md:pb-6">
-                    {/* Manual Set Selector (Fallback) */}
-                    <div className="bg-white/90 backdrop-blur rounded-full px-2 py-1 flex shadow-lg">
-                        <span className="text-xs font-bold text-gray-500 self-center px-2">ชุด (Manual):</span>
-                        {EXAM_SETS.map(s => (
-                            <button 
-                                key={s} 
-                                onClick={() => setGradingSet(s)} 
-                                className={`w-8 h-8 rounded-full text-sm font-black transition ${gradingSet === s ? 'bg-blue-600 text-white shadow-md transform scale-110' : 'text-gray-400 hover:bg-gray-100'}`}
-                            >
-                                {s}
-                            </button>
-                        ))}
-                    </div>
-
-                    <div className="flex items-center gap-6">
-                        <button onClick={() => setDebug(!debug)} className={`p-3 rounded-full ${debug ? 'bg-yellow-500' : 'bg-white/20 text-white backdrop-blur-md'}`}><Settings size={20} /></button>
-                        <button onClick={scan} disabled={scanning} className="w-20 h-20 bg-white rounded-full border-4 border-gray-300 flex items-center justify-center active:scale-95 transition shadow-2xl">
-                            <div className="w-16 h-16 bg-red-600 rounded-full border-4 border-white"></div>
-                        </button>
-                        <div className="flex flex-col items-center bg-black/40 px-3 py-2 rounded-xl backdrop-blur-md">
-                            <span className="text-[10px] text-white font-bold mb-1">ความสว่าง</span>
-                            <input type="range" min="50" max="200" value={threshold} onChange={e => setThreshold(Number(e.target.value))} className="w-20 h-1 accent-green-500"/>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Result Popup */}
-            {result && (
-                <div className="fixed inset-0 z-[60] bg-black/80 flex items-center justify-center p-4 backdrop-blur-md">
-                    <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden animate-in zoom-in shadow-2xl">
-                        <div className={`p-8 text-center ${result.score/quiz.questions >= 0.5 ? 'bg-green-500' : 'bg-red-500'} text-white relative overflow-hidden`}>
-                            <div className="absolute top-2 right-2 bg-white/30 text-xs font-bold px-2 py-1 rounded-full">
-                                Set {result.examSet}
-                            </div>
-                            <div className="text-7xl font-black">{Math.round((result.score / quiz.questions) * 100)}%</div>
-                            <div className="font-bold opacity-90 mt-1 text-xl">{result.score} / {quiz.questions} คะแนน</div>
-                            {matchedStudent ? (
-                                <div className="mt-4 bg-white/20 p-3 rounded-xl backdrop-blur-sm border border-white/30">
-                                    <div className="font-bold text-lg">{matchedStudent.name}</div>
-                                    <div className="text-xs opacity-80 font-mono tracking-wider">{matchedStudent.studentId} • {matchedStudent.classRoom}</div>
-                                </div>
-                            ) : (
-                                <div className="mt-4 text-white/60 text-sm font-bold bg-black/20 py-1 rounded-lg">ไม่พบรายชื่อในระบบ</div>
-                            )}
-                        </div>
-                        <div className="p-6 space-y-4">
-                            {!matchedStudent && (
-                                <div>
-                                    <label className="text-xs text-gray-400 font-bold block mb-1 ml-1 uppercase">แก้ไขรหัส</label>
-                                    <input value={result.studentId} onChange={e => setResult({...result, studentId: e.target.value})} className="w-full text-center font-mono font-bold text-3xl border-b-2 outline-none py-1 bg-gray-50 rounded-t-lg focus:border-blue-500 transition" maxLength={5}/>
-                                </div>
-                            )}
-                            <div className="flex gap-3">
-                                <button onClick={() => setResult(null)} className="flex-1 py-4 bg-gray-100 rounded-2xl font-bold text-gray-500 hover:bg-gray-200 transition">ยกเลิก</button>
-                                <button onClick={save} className="flex-[2] py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-xl shadow-blue-200 hover:bg-blue-700 transition flex justify-center items-center gap-2">
-                                    <Save size={20}/> บันทึกผลสอบ
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-}
-
-// --- TAB: RESULTS & EXPORT ---
-function ResultsTab({ user, quiz }: { user: User, quiz: Quiz }) {
-    const [results, setResults] = useState<any[]>([]);
-    const [students, setStudents] = useState<Record<string, Student>>({});
-    const [view, setView] = useState<'list' | 'report'>('list');
-    
-    useEffect(() => {
-        getDocs(query(collection(db, 'artifacts', appId, 'users', user.uid, 'students'))).then(snap => {
-            const map: Record<string, Student> = {};
-            snap.docs.forEach(d => { const s = d.data() as Student; map[s.studentId] = s; });
-            setStudents(map);
-        });
-
-        const q = query(collection(db, 'artifacts', appId, 'users', user.uid, 'quizzes', quiz.id, 'results'), orderBy('timestamp', 'desc'));
-        return onSnapshot(q, snap => setResults(snap.docs.map(d => ({id: d.id, ...d.data()}))));
-    }, []);
-
-    const exportCSV = () => {
-        const header = "Student ID,Name,Class,Score,Total,Percentage,Set,Date\n";
-        const rows = results.map(r => {
-            const s = students[r.studentId];
-            const pct = Math.round((r.score/quiz.questions)*100);
-            return `${r.studentId},"${s ? s.name : '-'}",${s ? s.classRoom : '-'},${r.score},${quiz.questions},${pct}%,${r.examSet || 'A'},"${new Date(r.timestamp.seconds*1000).toLocaleString()}"`;
-        }).join("\n");
-        const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a'); a.href = url; a.download = `${quiz.name}_Report.csv`; a.click();
-    };
-
-    if(view === 'report') {
-        return (
-            <div className="h-full bg-gray-200 overflow-y-auto p-8 flex flex-col items-center pb-32">
-                 <div className="w-[210mm] bg-white p-8 min-h-[297mm] shadow-xl print:shadow-none print:w-full">
-                    <div className="text-center border-b-2 border-black pb-4 mb-4">
-                        <h1 className="text-2xl font-bold">รายงานผลการสอบ: {quiz.name}</h1>
-                        <p className="text-gray-500">วันที่: {new Date().toLocaleDateString('th-TH')}</p>
-                    </div>
-                    <table className="w-full text-sm text-left">
-                        <thead className="border-b-2 border-black">
-                            <tr>
-                                <th className="py-2">ID</th>
-                                <th className="py-2">Name</th>
-                                <th className="py-2 text-right">Set</th>
-                                <th className="py-2 text-right">Score</th>
-                                <th className="py-2 text-right">%</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {results.map(r => {
-                                const s = students[r.studentId];
-                                return (
-                                    <tr key={r.id} className="border-b border-gray-100">
-                                        <td className="py-2 font-mono">{r.studentId}</td>
-                                        <td className="py-2">{s ? s.name : '-'}</td>
-                                        <td className="py-2 text-right font-bold text-gray-400">{r.examSet || 'A'}</td>
-                                        <td className="py-2 text-right font-bold">{r.score}/{quiz.questions}</td>
-                                        <td className="py-2 text-right">{Math.round((r.score/quiz.questions)*100)}%</td>
-                                    </tr>
-                                )
-                            })}
-                        </tbody>
-                    </table>
-                 </div>
-                 <div className="fixed bottom-20 right-6 flex gap-2 print:hidden">
-                     <button onClick={() => setView('list')} className="bg-gray-800 text-white px-4 py-3 rounded-full shadow-lg font-bold">กลับ</button>
-                     <button onClick={() => window.print()} className="bg-blue-600 text-white px-6 py-3 rounded-full shadow-lg font-bold flex items-center gap-2"><Printer size={20}/> พิมพ์ PDF</button>
-                 </div>
-            </div>
-        )
-    }
-
-    return (
-        <div className="h-full overflow-y-auto bg-gray-50 p-4 pb-24 max-w-4xl mx-auto">
-            <div className="flex justify-between items-center mb-6">
-                <div>
-                    <h3 className="font-bold text-gray-700 text-xl">ผลการสอบ ({results.length})</h3>
-                    <p className="text-xs text-gray-400">Export ข้อมูลเพื่อนำไปใช้ต่อ</p>
-                </div>
-                <div className="flex gap-2">
-                    <button onClick={() => setView('report')} className="bg-white border border-gray-200 text-gray-700 px-3 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:bg-gray-50">
-                        <Printer size={16}/> Report PDF
-                    </button>
-                    <button onClick={exportCSV} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 shadow-lg shadow-green-200 transition">
-                        <Download size={16}/> Excel/CSV
-                    </button>
-                </div>
-            </div>
-            
-            <div className="space-y-3">
-                {results.map(r => {
-                    const st = students[r.studentId];
-                    const percent = Math.round((r.score / quiz.questions) * 100);
-                    return (
-                        <div key={r.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center">
-                            <div className="flex items-center gap-4">
-                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-white text-sm shadow-md ${percent >= 50 ? 'bg-green-500 shadow-green-200' : 'bg-red-500 shadow-red-200'}`}>
-                                    {percent}%
-                                </div>
-                                <div>
-                                    <div className="font-bold text-gray-800 text-lg">{st ? st.name : `ID: ${r.studentId}`}</div>
-                                    <div className="text-xs text-gray-400 font-mono mt-0.5 flex gap-2">
-                                        <span>{st ? `${st.studentId} • ${st.classRoom}` : 'ไม่พบข้อมูลนักเรียน'}</span>
-                                        <span className="bg-gray-100 px-1 rounded text-black font-bold">Set {r.examSet || 'A'}</span>
+                    <div className="grid gap-4 md:grid-cols-2">
+                        {quizzes.map(q => (
+                            <div key={q.id} onClick={() => onSelect(q)} className="bg-white p-5 rounded-2xl shadow-sm border hover:shadow-md cursor-pointer relative group">
+                                <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-blue-500 rounded-l-2xl"></div>
+                                <div className="ml-3">
+                                    <div className="flex justify-between">
+                                        <h3 className="font-bold text-lg">{q.name}</h3>
+                                        <button onClick={(e)=>del(q.id, e)} className="text-gray-300 hover:text-red-500"><Trash2 size={18}/></button>
+                                    </div>
+                                    <div className="flex gap-3 text-sm text-gray-500 mt-2">
+                                        <span className="bg-gray-100 px-2 rounded flex items-center gap-1"><FileText size={12}/> {q.questions} ข้อ</span>
+                                        <span>{q.date?.seconds ? new Date(q.date.seconds*1000).toLocaleDateString('th-TH') : ''}</span>
                                     </div>
                                 </div>
                             </div>
-                            <div className="text-right">
-                                <div className="font-black text-2xl text-gray-800">{r.score}</div>
-                                <div className="text-[10px] text-gray-400 font-bold uppercase">Points</div>
+                        ))}
+                    </div>
+                    
+                    {showModal && (
+                        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+                            <div className="bg-white rounded-2xl p-6 w-full max-w-sm">
+                                <h3 className="text-xl font-bold mb-4">สร้างการสอบใหม่</h3>
+                                <input className="w-full border p-3 rounded-lg mb-4" placeholder="ชื่อวิชา" value={name} onChange={e => setName(e.target.value)} autoFocus />
+                                <div className="mb-4">
+                                    <label className="text-xs font-bold text-gray-500 mb-2 block">จำนวนข้อ</label>
+                                    <div className="grid grid-cols-4 gap-2">
+                                        {QUESTION_OPTIONS.map(n => (
+                                            <button key={n} onClick={() => setQCount(n)} className={`py-1 rounded border text-xs font-bold ${qCount===n?'bg-blue-50 border-blue-500 text-blue-600':'bg-white text-gray-500'}`}>{n}</button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button onClick={() => setShowModal(false)} className="flex-1 py-2 bg-gray-100 rounded-lg font-bold text-gray-500">ยกเลิก</button>
+                                    <button onClick={create} className="flex-1 py-2 bg-blue-600 text-white rounded-lg font-bold">สร้าง</button>
+                                </div>
                             </div>
                         </div>
-                    )
-                })}
-                {results.length === 0 && <div className="text-center py-10 text-gray-400">ยังไม่มีข้อมูลคะแนน</div>}
-            </div>
-        </div>
-    );
-}
+                    )}
+                </div>
+            )
+        }
+
+        function StudentView({ user }) {
+            const [students, setStudents] = useState([]);
+            const [mode, setMode] = useState('list');
+            const [bulk, setBulk] = useState("");
+
+            useEffect(() => {
+                const q = query(collection(db, 'artifacts', appId, 'users', user.uid, 'students'), orderBy('studentId'));
+                return onSnapshot(q, (snap) => setStudents(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+            }, [user]);
+
+            const importBulk = async () => {
+                const batch = writeBatch(db);
+                bulk.split('\n').forEach(l => {
+                    const p = l.trim().split(/\s+/);
+                    if(p.length >= 2 && p[0].length === 5) {
+                        const ref = doc(collection(db, 'artifacts', appId, 'users', user.uid, 'students'));
+                        batch.set(ref, { studentId: p[0], name: p.slice(1).join(' '), classRoom: '-' });
+                    }
+                });
+                await batch.commit();
+                setMode('list'); setBulk("");
+            }
+
+            const del = async (id) => { if(confirm("ลบ?")) await deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'students', id)); }
+
+            return (
+                <div className="p-6 pb-20 max-w-4xl mx-auto">
+                    <div className="flex justify-between items-center mb-6">
+                        <h2 className="text-2xl font-black text-gray-800">นักเรียน ({students.length})</h2>
+                        <button onClick={() => setMode('bulk')} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold flex gap-2"><Upload size={18}/> นำเข้า</button>
+                    </div>
+                    
+                    {mode === 'bulk' && (
+                        <div className="bg-white p-4 rounded-xl shadow-lg mb-6 relative">
+                            <button onClick={()=>setMode('list')} className="absolute top-2 right-2"><X/></button>
+                            <h3 className="font-bold mb-2">นำเข้า (รหัส เว้นวรรค ชื่อ)</h3>
+                            <textarea className="w-full h-32 border p-2 rounded" value={bulk} onChange={e=>setBulk(e.target.value)}></textarea>
+                            <button onClick={importBulk} className="w-full bg-blue-600 text-white py-2 rounded mt-2 font-bold">ยืนยัน</button>
+                        </div>
+                    )}
+
+                    <div className="bg-white rounded-xl shadow overflow-hidden">
+                        {students.map(s => (
+                            <div key={s.id} className="flex justify-between p-3 border-b last:border-0 hover:bg-gray-50">
+                                <div><span className="font-mono font-bold text-blue-600 mr-3">{s.studentId}</span>{s.name}</div>
+                                <button onClick={()=>del(s.id)} className="text-gray-300 hover:text-red-500"><Trash2 size={16}/></button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )
+        }
+
+        function QuizWorkspace({ user, quiz, onBack }) {
+            const [tab, setTab] = useState('scan');
+            return (
+                <div className="h-screen flex flex-col bg-gray-100 fixed inset-0 z-50">
+                    <div className="bg-white px-4 py-3 shadow-sm border-b flex justify-between items-center shrink-0 z-40">
+                        <div className="flex items-center gap-3">
+                            <button onClick={onBack} className="p-1 hover:bg-gray-100 rounded-full"><ArrowLeft/></button>
+                            <div>
+                                <div className="font-black text-lg leading-none">{quiz.name}</div>
+                                <div className="text-xs text-gray-500 mt-1">{quiz.questions} ข้อ</div>
+                            </div>
+                        </div>
+                        <div className="hidden md:flex gap-1">
+                            <TabBtn id="key" label="เฉลย" active={tab} set={setTab} />
+                            <TabBtn id="sheet" label="กระดาษ" active={tab} set={setTab} />
+                            <TabBtn id="scan" label="สแกน" active={tab} set={setTab} />
+                            <TabBtn id="results" label="ผลสอบ" active={tab} set={setTab} />
+                        </div>
+                    </div>
+                    <div className="flex-grow overflow-hidden relative bg-gray-50">
+                        {tab === 'key' && <KeyTab user={user} quiz={quiz} />}
+                        {tab === 'sheet' && <SheetTab quiz={quiz} />}
+                        {tab === 'scan' && <ScannerTab user={user} quiz={quiz} />}
+                        {tab === 'results' && <ResultsTab user={user} quiz={quiz} />}
+                    </div>
+                    <div className="md:hidden fixed bottom-0 w-full bg-white border-t flex justify-around p-2 pb-safe shadow-lg z-50">
+                        <MobileTabBtn id="key" icon={<Settings/>} label="เฉลย" active={tab} set={setTab} />
+                        <MobileTabBtn id="sheet" icon={<Printer/>} label="กระดาษ" active={tab} set={setTab} />
+                        <MobileTabBtn id="scan" icon={<Camera/>} label="สแกน" active={tab} set={setTab} isMain />
+                        <MobileTabBtn id="results" icon={<BarChart3/>} label="ผลสอบ" active={tab} set={setTab} />
+                    </div>
+                </div>
+            )
+        }
+
+        const TabBtn = ({id, label, active, set}) => (
+            <button onClick={()=>set(id)} className={`px-4 py-2 rounded-lg text-sm font-bold ${active===id?'bg-blue-50 text-blue-600':'text-gray-500'}`}>{label}</button>
+        );
+        const MobileTabBtn = ({id, icon, label, active, set, isMain}) => (
+            <button onClick={()=>set(id)} className={`flex flex-col items-center w-full ${active?'text-blue-600':'text-gray-400'}`}>
+                {isMain ? <div className={`p-3 rounded-full -mt-6 shadow-lg border-4 border-gray-100 ${active?'bg-blue-600 text-white':'bg-white text-gray-500'}`}>{icon}</div> : icon}
+                <span className="text-[10px] font-bold mt-1">{label}</span>
+            </button>
+        );
+
+        // --- QUIZ TABS ---
+
+        function KeyTab({ user, quiz }) {
+            const [set, setSet] = useState('A');
+            const [keys, setKeys] = useState(quiz.answerKeys || {'A':{}});
+            
+            const updateKey = (q, val) => {
+                const newKeys = { ...keys, [set]: { ...keys[set], [q]: val } };
+                setKeys(newKeys);
+            }
+            
+            const save = async () => {
+                await updateDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'quizzes', quiz.id), { answerKeys: keys });
+                alert("บันทึกแล้ว");
+            }
+
+            return (
+                <div className="h-full overflow-y-auto p-4 pb-24 max-w-3xl mx-auto">
+                    <div className="flex justify-between items-center mb-4 sticky top-0 bg-gray-50 py-2 z-10">
+                        <div className="flex gap-2">
+                            {EXAM_SETS.map(s => (
+                                <button key={s} onClick={()=>setSet(s)} className={`w-8 h-8 rounded font-bold shadow ${set===s?'bg-blue-600 text-white':'bg-white text-gray-500'}`}>{s}</button>
+                            ))}
+                        </div>
+                        <button onClick={save} className="bg-green-600 text-white px-6 py-1.5 rounded-lg font-bold shadow">บันทึก</button>
+                    </div>
+                    <div className="grid grid-cols-5 gap-2">
+                        {Array.from({length: quiz.questions}, (_, i) => i+1).map(q => (
+                            <div key={q} className="bg-white p-2 rounded border text-center">
+                                <div className="text-[10px] font-bold text-gray-400">{q}</div>
+                                <select 
+                                    className={`w-full text-center font-bold outline-none ${keys[set]?.[q] ? 'text-green-600':'text-gray-300'}`}
+                                    value={keys[set]?.[q] || '-'}
+                                    onChange={(e)=>updateKey(q, e.target.value)}
+                                >
+                                    <option value="-">-</option>
+                                    {CHOICES.map(c=><option key={c} value={c}>{c}</option>)}
+                                </select>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )
+        }
+
+        function SheetTab({ quiz }) {
+            const [size, setSize] = useState('A4');
+            const layout = getLayoutConfig(quiz.questions);
+            const style = size === 'A4' ? { width: '210mm', minHeight: '297mm' } : { width: '148mm', minHeight: '210mm' };
+
+            const print = () => {
+                const content = document.getElementById('sheet-preview').innerHTML;
+                const portal = document.getElementById('print-portal');
+                portal.innerHTML = `<div class="p-0 m-0 w-full h-full">${content}</div>`;
+                window.print();
+                portal.innerHTML = '';
+            }
+
+            return (
+                <div className="h-full flex flex-col items-center bg-gray-100 p-4 pb-24 overflow-y-auto">
+                    <div className="mb-4 flex gap-4 print:hidden">
+                        <div className="bg-white p-1 rounded flex">
+                            <button onClick={()=>setSize('A4')} className={`px-3 rounded ${size==='A4'?'bg-gray-200 font-bold':''}`}>A4</button>
+                            <button onClick={()=>setSize('A5')} className={`px-3 rounded ${size==='A5'?'bg-gray-200 font-bold':''}`}>A5</button>
+                        </div>
+                        <button onClick={print} className="bg-gray-900 text-white px-4 py-1 rounded font-bold shadow flex gap-2"><Printer size={18}/> พิมพ์</button>
+                    </div>
+                    
+                    <div id="sheet-preview">
+                        <div style={style} className={`bg-white shadow-xl p-8 relative box-border mx-auto text-black print:w-full print:shadow-none`}>
+                            <div className="absolute top-6 left-6 w-5 h-5 bg-black"></div>
+                            <div className="absolute top-6 right-6 w-5 h-5 bg-black"></div>
+                            <div className="absolute bottom-6 left-6 w-5 h-5 bg-black"></div>
+                            <div className="absolute bottom-6 right-6 w-5 h-5 bg-black"></div>
+
+                            <div className="mx-8 mt-4 border-b-2 border-black pb-2 flex justify-between items-start">
+                                <div>
+                                    <h1 className="text-3xl font-black uppercase">ANSWER SHEET</h1>
+                                    <div className="mt-2 space-y-1 w-64">
+                                        <div className="flex justify-between border-b border-gray-400"><span className="text-[10px] font-bold">NAME</span></div>
+                                        <div className="flex justify-between border-b border-gray-400"><span className="text-[10px] font-bold">DATE</span></div>
+                                    </div>
+                                    <div className="mt-3 flex items-center gap-2 border border-black p-1 rounded w-fit">
+                                        <span className="font-bold text-[9px]">TEST FORM:</span>
+                                        {EXAM_SETS.map(s => <div key={s} className="w-4 h-4 rounded-full border border-black flex items-center justify-center text-[8px] font-bold text-gray-300">{s}</div>)}
+                                    </div>
+                                </div>
+                                <div className="border border-black p-2">
+                                    <div className="text-[10px] font-black text-center mb-1">STUDENT ID</div>
+                                    <div className="grid grid-cols-5 gap-1">
+                                        {Array.from({length:10},(_,r)=><React.Fragment key={r}>{Array.from({length:5}).map((_,c)=><div key={c} className="w-4 h-4 rounded-full border border-gray-400 flex items-center justify-center text-[8px] text-gray-400">{r}</div>)}</React.Fragment>)}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="mx-8 mt-6 flex justify-between gap-8">
+                                {layout.ranges.map((range, idx) => (
+                                    <div key={idx} className="flex-1">
+                                        {Array.from({ length: range.end - range.start + 1 }, (_, i) => range.start + i).map(q => (
+                                            <div key={q} className="flex items-center gap-2 mb-1">
+                                                <span className="font-bold w-5 text-right font-mono text-[10px]">{q}</span>
+                                                <div className="flex gap-1.5">
+                                                    {CHOICES.map(c => <div key={c} className="w-5 h-5 rounded-full border border-gray-600 flex items-center justify-center text-[8px] font-bold text-gray-300">{c}</div>)}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )
+        }
+
+        function ScannerTab({ user, quiz }) {
+            const videoRef = useRef(null);
+            const [result, setResult] = useState(null);
+            const [scanning, setScanning] = useState(false);
+            const [students, setStudents] = useState([]);
+            const [threshold, setThreshold] = useState(110);
+
+            useEffect(() => {
+                getDocs(query(collection(db, 'artifacts', appId, 'users', user.uid, 'students'))).then(s => setStudents(s.docs.map(d=>d.data())));
+                navigator.mediaDevices.getUserMedia({video:{facingMode:'environment', width: {ideal: 1920}, height: {ideal: 1080}}})
+                    .then(s => { if(videoRef.current) videoRef.current.srcObject = s; })
+                    .catch(e => console.error(e));
+            }, []);
+
+            const scan = () => {
+                if(scanning || !videoRef.current) return;
+                setScanning(true);
+                const cvs = document.createElement('canvas');
+                cvs.width = videoRef.current.videoWidth;
+                cvs.height = videoRef.current.videoHeight;
+                const ctx = cvs.getContext('2d');
+                ctx.drawImage(videoRef.current, 0, 0);
+
+                const { studentId, answers, detectedSet } = analyzePaperImage(ctx, cvs.width, cvs.height, quiz.questions, threshold);
+                
+                // Grading
+                const examSet = detectedSet || 'A';
+                const key = quiz.answerKeys[examSet] || {};
+                let score = 0;
+                Object.keys(answers).forEach(q => { if(answers[q] === key[q]) score++; });
+
+                const st = students.find(s => s.studentId === studentId);
+                setResult({ studentId, score, examSet, answers, matchedName: st ? st.name : null });
+                if(navigator.vibrate) navigator.vibrate(200);
+                setScanning(false);
+            }
+
+            const save = async () => {
+                await addDoc(collection(db, 'artifacts', appId, 'users', user.uid, 'quizzes', quiz.id, 'results'), { ...result, timestamp: Timestamp.now() });
+                setResult(null);
+            }
+
+            return (
+                <div className="h-full bg-black relative flex flex-col">
+                    <div className="relative flex-grow overflow-hidden">
+                        <video ref={videoRef} autoPlay muted playsInline className="absolute inset-0 w-full h-full object-cover opacity-90" />
+                        <div className="absolute inset-0 pointer-events-none z-10 p-4">
+                            <div className="w-full h-full border-[20px] border-black/60 relative">
+                                <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-green-400 -m-1"></div>
+                                <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-green-400 -m-1"></div>
+                                <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-green-400 -m-1"></div>
+                                <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-green-400 -m-1"></div>
+                                <div className="absolute top-1/4 right-8 text-yellow-200 text-xs font-bold bg-black/50 px-2">ID</div>
+                                <div className="absolute top-[15%] left-[45%] text-orange-200 text-xs font-bold bg-black/50 px-2">SET</div>
+                            </div>
+                        </div>
+                        <div className="absolute bottom-24 w-full flex flex-col items-center gap-4 z-20">
+                            <div className="bg-black/50 px-3 py-1 rounded-full text-white text-xs flex gap-2">
+                                <span>Light:</span><input type="range" min="50" max="200" value={threshold} onChange={e=>setThreshold(Number(e.target.value))} className="w-20"/>
+                            </div>
+                            <button onClick={scan} disabled={scanning} className="w-20 h-20 bg-white rounded-full border-4 border-gray-400 flex items-center justify-center active:scale-95 shadow-2xl">
+                                <div className="w-16 h-16 bg-red-600 rounded-full border-2 border-white"></div>
+                            </button>
+                        </div>
+                    </div>
+                    {result && (
+                        <div className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4">
+                            <div className="bg-white rounded-2xl w-full max-w-sm animate-in zoom-in overflow-hidden shadow-2xl">
+                                <div className={`p-6 text-center ${result.score >= quiz.questions/2 ? 'bg-green-600' : 'bg-red-600'} text-white`}>
+                                    <div className="absolute top-2 right-2 bg-white/20 px-2 rounded text-xs font-bold">Set {result.examSet}</div>
+                                    <div className="text-6xl font-black">{Math.round(result.score/quiz.questions*100)}%</div>
+                                    <div className="font-bold text-xl">{result.score} / {quiz.questions}</div>
+                                    <div className="mt-2 bg-black/20 p-2 rounded">
+                                        <div className="text-lg font-bold">{result.matchedName || 'Unknown Student'}</div>
+                                        <div className="text-xs font-mono">{result.studentId}</div>
+                                    </div>
+                                </div>
+                                <div className="p-4 flex gap-2">
+                                    <button onClick={()=>setResult(null)} className="flex-1 py-3 bg-gray-100 rounded font-bold text-gray-500">ยกเลิก</button>
+                                    <button onClick={save} className="flex-1 py-3 bg-blue-600 text-white rounded font-bold">บันทึก</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )
+        }
+
+        function ResultsTab({ user, quiz }) {
+            const [results, setResults] = useState([]);
+            const [students, setStudents] = useState({});
+
+            useEffect(() => {
+                getDocs(query(collection(db, 'artifacts', appId, 'users', user.uid, 'students'))).then(s => {
+                    const map = {}; s.docs.forEach(d=>map[d.data().studentId]=d.data());
+                    setStudents(map);
+                });
+                const q = query(collection(db, 'artifacts', appId, 'users', user.uid, 'quizzes', quiz.id, 'results'), orderBy('timestamp', 'desc'));
+                return onSnapshot(q, (s) => setResults(s.docs.map(d=>({id:d.id, ...d.data()}))));
+            }, []);
+
+            const csv = () => {
+                const head = "ID,Name,Set,Score,Max,%\n";
+                const rows = results.map(r => `${r.studentId},${students[r.studentId]?.name||'-'},${r.examSet},${r.score},${quiz.questions},${Math.round(r.score/quiz.questions*100)}`).join('\n');
+                const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([head+rows])); a.download="report.csv"; a.click();
+            }
+
+            return (
+                <div className="p-4 overflow-y-auto pb-24 h-full">
+                    <div className="flex justify-between mb-4">
+                        <h2 className="font-bold text-xl">ผลการสอบ ({results.length})</h2>
+                        <button onClick={csv} className="bg-green-600 text-white px-3 py-1 rounded font-bold text-sm shadow">Export CSV</button>
+                    </div>
+                    <div className="bg-white rounded-xl shadow border overflow-hidden">
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-gray-50 font-bold border-b"><tr><th className="p-3">ID</th><th className="p-3">Name</th><th className="p-3">Set</th><th className="p-3 text-right">Score</th></tr></thead>
+                            <tbody>
+                                {results.map(r => (
+                                    <tr key={r.id} className="border-b last:border-0 hover:bg-gray-50">
+                                        <td className="p-3 font-mono text-blue-600">{r.studentId}</td>
+                                        <td className="p-3">{students[r.studentId]?.name || '-'}</td>
+                                        <td className="p-3 text-gray-400 font-bold">{r.examSet}</td>
+                                        <td className="p-3 text-right font-black">{r.score}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )
+        }
+
+        const root = createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
