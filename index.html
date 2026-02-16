@@ -12,13 +12,18 @@
         body { font-family: 'Prompt', sans-serif; background-color: #f3f4f6; }
         
         /* ========================================= */
-        /* CSS สำหรับการพิมพ์ (เหมือนในโค้ดหลัก)        */
+        /* CSS สำหรับการพิมพ์ (แบบทางการ)             */
         /* ========================================= */
         @media print {
-            body * { visibility: hidden; } /* ซ่อนทุกอย่างก่อน */
+            body * { visibility: hidden; }
             * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
             
-            /* แสดงเฉพาะส่วน Container ของรายงาน */
+            /* บังคับใช้ฟอนต์สารบรรณสำหรับการพิมพ์ */
+            body, .print-container * {
+                font-family: 'Sarabun', sans-serif !important;
+                color: black !important;
+            }
+
             .print-container, .print-container * { visibility: visible; }
 
             body {
@@ -32,64 +37,113 @@
                 left: 0;
                 top: 0;
                 width: 100% !important;
-                padding: 20px !important;
+                padding: 40px 50px !important; /* ระยะขอบกระดาษมาตรฐาน */
                 background: white !important;
                 border: none !important;
                 box-shadow: none !important;
             }
 
-            /* ซ่อนปุ่มต่างๆ เวลาพิมพ์ */
             .no-print { display: none !important; }
 
-            /* จัดตารางให้สวยงามเวลาพิมพ์ */
-            table { width: 100% !important; border-collapse: collapse !important; }
-            th, td {
-                border: 1px solid #333 !important;
+            /* ตารางแบบทางการ */
+            table { 
+                width: 100% !important; 
+                border-collapse: collapse !important; 
+                margin-top: 20px;
+                margin-bottom: 20px;
+            }
+            th {
+                border: 1px solid black !important;
                 padding: 8px !important;
-                font-size: 12px !important;
-                color: black !important;
+                font-size: 14px !important;
+                font-weight: bold !important;
+                background-color: #f0f0f0 !important;
+                text-align: center !important;
+            }
+            td {
+                border: 1px solid black !important;
+                padding: 8px !important;
+                font-size: 14px !important;
+                vertical-align: top;
             }
             
-            /* แสดงหัวกระดาษเฉพาะตอนพิมพ์ */
-            .print-header {
-                display: block !important;
+            /* ซ่อนสีพื้นหลังของสถานะ ให้เหลือแค่ข้อความ */
+            .status-badge {
+                border: none !important;
+                background: none !important;
+                padding: 0 !important;
+                font-weight: normal !important;
+                color: black !important;
+            }
+
+            /* ส่วนลงนามท้ายกระดาษ */
+            .signature-section {
+                display: flex !important;
+                justify-content: space-between;
+                margin-top: 60px;
+                page-break-inside: avoid;
+            }
+            .signature-box {
                 text-align: center;
-                margin-bottom: 20px;
-                border-bottom: 2px solid #333;
-                padding-bottom: 10px;
+                width: 40%;
+            }
+            .signature-line {
+                border-bottom: 1px dotted black;
+                width: 80%;
+                margin: 30px auto 10px auto;
+                height: 1px;
             }
         }
 
-        /* ซ่อนหัวกระดาษในหน้าจอปกติ */
-        .print-header { display: none; }
+        /* ซ่อนส่วนที่ใช้เฉพาะตอนพิมพ์ในหน้าจอปกติ */
+        .print-only { display: none; }
+        @media print { .print-only { display: block !important; } }
+        
+        /* ซ่อน Grid การ์ดสีสวยงามตอนพิมพ์ */
+        @media print { .summary-cards { display: none !important; } }
     </style>
 </head>
 <body class="p-8">
 
     <div class="max-w-5xl mx-auto">
-        <!-- แถบเครื่องมือ (จะไม่แสดงตอนพิมพ์) -->
+        <!-- แถบเครื่องมือ -->
         <div class="flex justify-between items-center mb-6 no-print bg-white p-4 rounded-lg shadow">
             <h2 class="text-2xl font-bold text-gray-800 flex items-center">
-                <i class="fas fa-clipboard-list mr-2 text-orange-600"></i> ตัวอย่างหน้าจอรายงาน
+                <i class="fas fa-file-alt mr-2 text-orange-600"></i> ตัวอย่างรายงาน (แบบทางการ)
             </h2>
-            <button onclick="window.print()" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded shadow flex items-center gap-2">
-                <i class="fas fa-print"></i> ทดสอบพิมพ์รายงาน
+            <button onclick="window.print()" class="bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded shadow flex items-center gap-2 font-medium">
+                <i class="fas fa-print"></i> พิมพ์เอกสาร
             </button>
         </div>
 
         <!-- ======================================================= -->
         <!-- ส่วนนี้คือส่วนที่จะถูกพิมพ์ออกมา (Print Container) -->
         <!-- ======================================================= -->
-        <div class="print-container bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+        <div class="print-container bg-white p-8 rounded-xl shadow-sm border border-gray-200">
             
-            <!-- หัวกระดาษ (แสดงเฉพาะตอนพิมพ์) -->
-            <div class="print-header">
-                <h1 class="text-2xl font-bold">รายงานสรุปยอดบริจาค - วัดไชยามาตย์</h1>
-                <p class="text-sm text-gray-600">พิมพ์ข้อมูล ณ วันที่: 16 กุมภาพันธ์ 2569 เวลา 10:30 น.</p>
+            <!-- หัวกระดาษแบบทางการ -->
+            <div class="print-only text-center mb-6">
+                <!-- ตราครุฑจำลอง (ใช้ไอคอนแทน หรือลบออกถ้าไม่มีไฟล์รูป) -->
+                <div class="mb-4">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c9/Garuda_Emblem_of_Thailand.svg/1200px-Garuda_Emblem_of_Thailand.svg.png" alt="Garuda" style="height: 60px; display: inline-block; filter: grayscale(100%);">
+                </div>
+                <h1 class="text-2xl font-bold mb-1">บันทึกรายงานสรุปยอดบริจาค</h1>
+                <h2 class="text-xl font-bold mb-1">วัดไชยามาตย์</h2>
+                <p class="text-sm">หมู่ที่ 1 ตำบลเวียงทอง อำเภอสูงเม่น จังหวัดแพร่ 54130</p>
+                <div class="flex justify-between items-end mt-4 border-b border-black pb-2">
+                    <div class="text-sm text-left">
+                        <strong>เลขที่เอกสาร:</strong> REP-2569/02/16-001<br>
+                        <strong>พิมพ์โดย:</strong> เจ้าหน้าที่ระบบ
+                    </div>
+                    <div class="text-sm text-right">
+                        <strong>วันที่:</strong> 16 กุมภาพันธ์ 2569<br>
+                        <strong>เวลา:</strong> 10:30 น.
+                    </div>
+                </div>
             </div>
 
-            <!-- การ์ดสรุปยอด -->
-            <div class="grid grid-cols-3 gap-4 mb-6">
+            <!-- การ์ดสรุปยอด (แสดงบนหน้าจอ Modern) -->
+            <div class="summary-cards grid grid-cols-3 gap-4 mb-6 no-print">
                 <div class="bg-white p-4 rounded-xl border border-orange-100 text-center shadow-sm">
                     <span class="text-sm font-medium text-gray-500 block mb-1">ยอดรวม (อนุมัติแล้ว)</span>
                     <span class="text-3xl font-bold text-green-600">15,500 ฿</span>
@@ -104,92 +158,124 @@
                 </div>
             </div>
 
+            <!-- สรุปยอดแบบทางการ (แสดงเฉพาะตอนพิมพ์) -->
+            <div class="print-only mb-4 p-4 border border-black">
+                <h3 class="font-bold border-b border-black mb-2 pb-1">สรุปภาพรวมประจำวัน</h3>
+                <div class="flex justify-between text-sm">
+                    <div>
+                        <span>จำนวนรายการทั้งหมด:</span> <span class="font-bold ml-2">6 รายการ</span>
+                    </div>
+                    <div>
+                        <span>ยอดเงินรวมสุทธิ (อนุมัติแล้ว):</span> <span class="font-bold ml-2">15,500 บาท</span>
+                    </div>
+                </div>
+                <div class="flex justify-between text-sm mt-1">
+                    <div>
+                        <span>รายการรอตรวจสอบ:</span> <span class="font-bold ml-2">1 รายการ</span>
+                    </div>
+                    <div>
+                        <span>(หนึ่งหมื่นห้าพันห้าร้อยบาทถ้วน)</span>
+                    </div>
+                </div>
+            </div>
+
             <!-- ตารางข้อมูล -->
-            <div class="overflow-x-auto rounded-lg border border-gray-200">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
+            <div class="overflow-x-auto">
+                <table class="min-w-full">
+                    <thead>
                         <tr>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">วัน-เวลา / ชื่อ</th>
-                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">รายการบริจาค</th>
-                            <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">ยอดเงิน</th>
-                            <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">ช่องทาง</th>
-                            <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">สถานะ</th>
+                            <th style="width: 5%;">ลำดับ</th>
+                            <th style="width: 15%;">วัน-เวลา</th>
+                            <th style="width: 20%;">ชื่อผู้บริจาค</th>
+                            <th style="width: 25%;">รายการบริจาค</th>
+                            <th style="width: 10%;">ช่องทาง</th>
+                            <th style="width: 15%;">จำนวนเงิน</th>
+                            <th style="width: 10%;">หมายเหตุ</th>
                         </tr>
                     </thead>
-                    <tbody class="bg-white divide-y divide-gray-200 text-sm">
+                    <tbody>
                         <!-- รายการที่ 1 -->
                         <tr>
-                            <td class="px-4 py-3">
-                                <div class="font-bold text-gray-900">คุณสมชาย ใจดี</div>
-                                <div class="text-xs text-gray-500">16/02/2569 09:15</div>
-                            </td>
-                            <td class="px-4 py-3">
-                                <div class="text-gray-900">ไทยทาน 5 ชุด (1,500 บาท)</div>
-                            </td>
-                            <td class="px-4 py-3 text-right font-bold text-gray-900">1,500</td>
-                            <td class="px-4 py-3 text-center text-gray-600">เงินโอน</td>
-                            <td class="px-4 py-3 text-center"><span class="px-2 py-1 rounded-full bg-green-100 text-green-800 text-xs border border-green-200">อนุมัติ</span></td>
+                            <td class="text-center">1</td>
+                            <td class="text-center">16/02/2569<br>09:15</td>
+                            <td>คุณสมชาย ใจดี</td>
+                            <td>ไทยทาน 5 ชุด</td>
+                            <td class="text-center">เงินโอน</td>
+                            <td class="text-right font-bold">1,500.00</td>
+                            <td class="text-center"></td>
                         </tr>
                         <!-- รายการที่ 2 -->
                         <tr>
-                            <td class="px-4 py-3">
-                                <div class="font-bold text-gray-900">คุณมานี มีสุข</div>
-                                <div class="text-xs text-gray-500">16/02/2569 08:30</div>
-                            </td>
-                            <td class="px-4 py-3">
-                                <div class="text-gray-900">ค่าน้ำค่าไฟ</div>
-                            </td>
-                            <td class="px-4 py-3 text-right font-bold text-gray-900">500</td>
-                            <td class="px-4 py-3 text-center text-gray-600">เงินสด</td>
-                            <td class="px-4 py-3 text-center"><span class="px-2 py-1 rounded-full bg-green-100 text-green-800 text-xs border border-green-200">อนุมัติ</span></td>
+                            <td class="text-center">2</td>
+                            <td class="text-center">16/02/2569<br>08:30</td>
+                            <td>คุณมานี มีสุข</td>
+                            <td>ค่าน้ำค่าไฟ</td>
+                            <td class="text-center">เงินสด</td>
+                            <td class="text-right font-bold">500.00</td>
+                            <td class="text-center"></td>
                         </tr>
-                        <!-- รายการที่ 3 (จองโรงทาน) -->
+                        <!-- รายการที่ 3 -->
                         <tr>
-                            <td class="px-4 py-3">
-                                <div class="font-bold text-gray-900">ร้านป้าแจ่ม</div>
-                                <div class="text-xs text-gray-500">15/02/2569 14:20</div>
-                            </td>
-                            <td class="px-4 py-3">
-                                <div class="text-gray-900">จองโรงทาน</div>
-                                <div class="text-xs text-orange-600 font-medium">วันที่: 20/02/2569 (ก๋วยเตี๋ยวไก่)</div>
-                            </td>
-                            <td class="px-4 py-3 text-right font-bold text-gray-900">0</td>
-                            <td class="px-4 py-3 text-center text-gray-600">อื่นๆ</td>
-                            <td class="px-4 py-3 text-center"><span class="px-2 py-1 rounded-full bg-green-100 text-green-800 text-xs border border-green-200">อนุมัติ</span></td>
+                            <td class="text-center">3</td>
+                            <td class="text-center">15/02/2569<br>14:20</td>
+                            <td>ร้านป้าแจ่ม</td>
+                            <td>จองโรงทาน (ก๋วยเตี๋ยวไก่)<br><span class="text-xs">วันที่: 20/02/2569</span></td>
+                            <td class="text-center">อื่นๆ</td>
+                            <td class="text-right font-bold">-</td>
+                            <td class="text-center">ของบริจาค</td>
                         </tr>
-                        <!-- รายการที่ 4 (บริจาคเยอะ) -->
+                        <!-- รายการที่ 4 -->
                         <tr>
-                            <td class="px-4 py-3">
-                                <div class="font-bold text-gray-900">ครอบครัวกิจเจริญ</div>
-                                <div class="text-xs text-gray-500">15/02/2569 10:00</div>
-                            </td>
-                            <td class="px-4 py-3">
-                                <div class="text-gray-900">หัววัด 20 ชุด (10,000 บาท), ค่าน้ำค่าไฟ 3,500 บาท</div>
-                            </td>
-                            <td class="px-4 py-3 text-right font-bold text-gray-900">13,500</td>
-                            <td class="px-4 py-3 text-center text-gray-600">เงินโอน</td>
-                            <td class="px-4 py-3 text-center"><span class="px-2 py-1 rounded-full bg-green-100 text-green-800 text-xs border border-green-200">อนุมัติ</span></td>
+                            <td class="text-center">4</td>
+                            <td class="text-center">15/02/2569<br>10:00</td>
+                            <td>ครอบครัวกิจเจริญ</td>
+                            <td>หัววัด 20 ชุด, ค่าน้ำค่าไฟ</td>
+                            <td class="text-center">เงินโอน</td>
+                            <td class="text-right font-bold">13,500.00</td>
+                            <td class="text-center"></td>
                         </tr>
                         <!-- รายการที่ 5 (รอตรวจสอบ) -->
-                        <tr class="bg-yellow-50">
-                            <td class="px-4 py-3">
-                                <div class="font-bold text-gray-900">ผู้ไม่ประสงค์ออกนาม</div>
-                                <div class="text-xs text-gray-500">วันนี้ 10:00</div>
-                            </td>
-                            <td class="px-4 py-3">
-                                <div class="text-gray-900">บริจาคทั่วไป</div>
-                            </td>
-                            <td class="px-4 py-3 text-right font-bold text-gray-900">100</td>
-                            <td class="px-4 py-3 text-center text-gray-600">เงินโอน</td>
-                            <td class="px-4 py-3 text-center"><span class="px-2 py-1 rounded-full bg-yellow-100 text-yellow-800 text-xs border border-yellow-200">รอตรวจ</span></td>
+                        <tr class="bg-yellow-50 print:bg-transparent">
+                            <td class="text-center">5</td>
+                            <td class="text-center">วันนี้<br>10:00</td>
+                            <td>ผู้ไม่ประสงค์ออกนาม</td>
+                            <td>บริจาคทั่วไป</td>
+                            <td class="text-center">เงินโอน</td>
+                            <td class="text-right font-bold">100.00</td>
+                            <td class="text-center text-xs">รอตรวจสอบ</td>
+                        </tr>
+                        <!-- รวมท้ายตาราง -->
+                        <tr class="font-bold bg-gray-100 print:bg-transparent">
+                            <td colspan="5" class="text-right pr-4">รวมยอดเงินทั้งสิ้น</td>
+                            <td class="text-right border-double border-b-4">15,600.00</td>
+                            <td></td>
                         </tr>
                     </tbody>
                 </table>
             </div>
             
-            <div class="mt-4 text-xs text-gray-400 text-right no-print">
-                * รายการสีเหลืองคือรายการที่รอตรวจสอบ
+            <div class="mt-4 text-xs text-gray-500 text-left no-print">
+                * รายการที่มีพื้นหลังสีเหลืองคือรายการที่อยู่ระหว่างการตรวจสอบ
             </div>
+
+            <!-- ส่วนลงนาม (แสดงเฉพาะตอนพิมพ์) -->
+            <div class="print-only signature-section">
+                <div class="signature-box">
+                    <p>จึงเรียนมาเพื่อโปรดทราบ</p>
+                    <div class="signature-line"></div>
+                    <p>(.......................................................)</p>
+                    <p class="font-bold mt-1">เจ้าหน้าที่การเงิน / ผู้จัดทำ</p>
+                    <p class="text-sm mt-1">วันที่ ......../......../............</p>
+                </div>
+                <div class="signature-box">
+                    <p>ทราบ / ดำเนินการ</p>
+                    <div class="signature-line"></div>
+                    <p>(.......................................................)</p>
+                    <p class="font-bold mt-1">เจ้าอาวาส / ประธานกรรมการ</p>
+                    <p class="text-sm mt-1">วันที่ ......../......../............</p>
+                </div>
+            </div>
+
         </div>
     </div>
 
