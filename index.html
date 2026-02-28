@@ -1,582 +1,474 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>วัดไชยามาตย์ - ระบบบริจาคออนไลน์</title>
-    
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        primary: { 50: '#fff7ed', 100: '#ffedd5', 200: '#fed7aa', 300: '#fdba74', 400: '#fb923c', 500: '#f97316', 600: '#ea580c', 700: '#c2410c', 800: '#9a3412', 900: '#7c2d12' },
-                        gold: { 400: '#fbbf24', 500: '#f59e0b', 600: '#d97706' }
-                    },
-                    fontFamily: {
-                        sans: ['Prompt', 'sans-serif'],
-                    },
-                    boxShadow: {
-                        'soft': '0 20px 40px -15px rgba(0, 0, 0, 0.1)',
-                        'glow': '0 0 20px rgba(249, 115, 22, 0.3)',
-                    }
-                }
-            }
-        }
-    </script>
-    
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Prompt:wght@200;300;400;500;600;700&display=swap" rel="stylesheet">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bio Space 🧬</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Google Fonts: Mali -->
+  <link href="https://fonts.googleapis.com/css2?family=Mali:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
 
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
-    <script type="importmap">
-    {
-        "imports": {
-            "react": "https://esm.sh/react@18.2.0",
-            "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
-            "lucide-react": "https://esm.sh/lucide-react@0.292.0",
-            "firebase/app": "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js",
-            "firebase/auth": "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js",
-            "firebase/firestore": "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js"
-        }
+  <style>
+    body {
+      font-family: 'Mali', cursive;
     }
-    </script>
+    
+    /* Animations */
+    @keyframes fade-in-up {
+      0% { opacity: 0; transform: translateY(30px) scale(0.95); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes scale-in {
+      0% { opacity: 0; transform: scale(0.9); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+    @keyframes fade-in {
+      0% { opacity: 0; backdrop-filter: blur(0px); }
+      100% { opacity: 1; backdrop-filter: blur(12px); }
+    }
+    @keyframes float {
+      0% { transform: translateY(0px) rotate(0deg); }
+      50% { transform: translateY(-20px) rotate(5deg); }
+      100% { transform: translateY(0px) rotate(0deg); }
+    }
+    @keyframes float-slow {
+      0% { transform: translateY(0px) translateX(0px) rotate(0deg); }
+      33% { transform: translateY(-15px) translateX(10px) rotate(-5deg); }
+      66% { transform: translateY(10px) translateX(-10px) rotate(5deg); }
+      100% { transform: translateY(0px) translateX(0px) rotate(0deg); }
+    }
+    @keyframes spin-slow {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    @keyframes bounce-x {
+      0%, 100% { transform: translateX(0); }
+      50% { transform: translateX(5px); }
+    }
+    @keyframes pulse-slow {
+      0%, 100% { opacity: 0.2; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(1.1); }
+    }
+    
+    .animate-fade-in-up { animation: fade-in-up 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+    .animate-scale-in { animation: scale-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+    .animate-fade-in { animation: fade-in 0.4s ease-out forwards; }
+    .animate-float { animation: float 6s ease-in-out infinite; }
+    .animate-float-slow { animation: float-slow 10s ease-in-out infinite; }
+    .animate-spin-slow { animation: spin-slow 12s linear infinite; }
+    .animate-bounce-x { animation: bounce-x 1.5s ease-in-out infinite; }
+    .animate-pulse-slow { animation: pulse-slow 8s ease-in-out infinite; }
 
-    <style>
-        /* Modern Reset & Base */
-        html { scroll-behavior: smooth; }
-        body { 
-            font-family: 'Prompt', sans-serif; 
-            background-color: #f8fafc;
-            color: #1e293b;
-            -webkit-font-smoothing: antialiased;
-        }
-
-        /* Animations */
-        @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-        .animate-fade-up { animation: fadeUp 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
-        
-        @keyframes scaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-        .animate-scale-in { animation: scaleIn 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
-
-        @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-10px); } 100% { transform: translateY(0px); } }
-        .animate-float { animation: float 6s ease-in-out infinite; }
-
-        @keyframes marquee { 0% { transform: translateX(100%); } 100% { transform: translateX(-100%); } }
-        .animate-marquee { animation: marquee 30s linear infinite; }
-
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-        .hide-scrollbar::-webkit-scrollbar { display: none; }
-
-        /* Glassmorphism Classes */
-        .glass-panel {
-            background: rgba(255, 255, 255, 0.85);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.5);
-        }
-        .glass-dark {
-            background: rgba(15, 23, 42, 0.6);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        /* Gradient Text */
-        .text-gradient {
-            background: linear-gradient(135deg, #ea580c 0%, #f59e0b 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        /* Print Styles */
-        @media print {
-            body * { visibility: hidden; }
-            .print-container, .print-container * { visibility: visible; }
-            .print-container { position: absolute; left: 0; top: 0; width: 100%; }
-            .no-print { display: none !important; }
-        }
-    </style>
+    /* Custom Scrollbar for Textarea */
+    textarea::-webkit-scrollbar {
+      width: 8px;
+    }
+    textarea::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.1); 
+      border-radius: 10px;
+    }
+    textarea::-webkit-scrollbar-thumb {
+      background: rgba(236, 72, 153, 0.3); 
+      border-radius: 10px;
+    }
+    textarea::-webkit-scrollbar-thumb:hover {
+      background: rgba(236, 72, 153, 0.5); 
+    }
+  </style>
 </head>
-<body>
-    <div id="root"></div>
+<body class="min-h-[100dvh] bg-gradient-to-br from-[#FFE4E1] via-[#F0F8FF] to-[#E6E6FA] text-purple-900 flex flex-col items-center justify-center p-4 relative overflow-x-hidden selection:bg-pink-300 selection:text-white transition-colors duration-700" id="main-body">
 
-    <script type="text/babel" data-type="module">
-        import React, { useState, useEffect, useMemo, useRef } from 'react';
-        import { createRoot } from 'react-dom/client';
-        import { 
-            Home, PlusCircle, ClipboardList, CheckCircle, User, ShieldCheck, Filter, 
-            Check, X, ArrowLeft, HeartHandshake, MapPin, Phone, Calendar, BookOpen, 
-            Menu, ChevronRight, Download, Printer, Lock, LogOut, FileText, Megaphone, 
-            Mic, RotateCcw, CalendarDays, Pencil, Save, Key, QrCode, ShoppingBag, 
-            UploadCloud, Image as ImageIcon, Loader, Info, Settings, Trash2, AlertTriangle, 
-            Plus, LogIn, Facebook, MessageCircle, SlidersHorizontal, ArrowRight, Star
-        } from 'lucide-react';
-        import { initializeApp } from "firebase/app";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
-        import { getFirestore, collection, addDoc, updateDoc, doc, onSnapshot, query, setDoc, deleteDoc, getDocs, writeBatch } from "firebase/firestore";
+  <!-- Colorful Background Glowing Orbs -->
+  <div id="bg-orbs">
+    <div class="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-pink-400/20 blur-[100px] rounded-full pointer-events-none animate-pulse-slow"></div>
+    <div class="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-cyan-400/20 blur-[120px] rounded-full pointer-events-none animate-pulse-slow" style="animation-delay: 2s;"></div>
+    <div class="absolute top-[40%] left-[30%] w-[30%] h-[30%] bg-yellow-300/20 blur-[80px] rounded-full pointer-events-none animate-pulse-slow" style="animation-delay: 1s;"></div>
+  </div>
+  
+  <!-- Floating Cute Icons Background -->
+  <div class="absolute inset-0 overflow-hidden pointer-events-none" id="floating-icons">
+    <i data-lucide="dna" class="absolute top-[15%] left-[5%] w-16 h-16 text-pink-400/40 animate-float drop-shadow-sm" style="animation-delay: 0s;"></i>
+    <i data-lucide="leaf" class="absolute top-[60%] left-[10%] w-12 h-12 text-green-400/40 animate-float-slow drop-shadow-sm" style="animation-delay: 1s;"></i>
+    <i data-lucide="test-tubes" class="absolute top-[20%] right-[10%] w-20 h-20 text-cyan-400/40 animate-float drop-shadow-sm" style="animation-delay: 2.5s;"></i>
+    <i data-lucide="microscope" class="absolute bottom-[15%] right-[5%] w-24 h-24 text-purple-400/30 animate-float-slow drop-shadow-sm" style="animation-delay: 0.5s;"></i>
+    <i data-lucide="star" class="absolute top-[10%] right-[30%] w-8 h-8 text-yellow-400/60 animate-bounce fill-yellow-200" style="animation-delay: 1s;"></i>
+    <i data-lucide="heart-pulse" class="absolute bottom-[40%] left-[80%] w-10 h-10 text-red-400/40 animate-pulse drop-shadow-md" style="animation-delay: 0.2s;"></i>
+  </div>
 
-        // --- Configuration ---
-        const firebaseConfig = {
-            apiKey: "AIzaSyAHuvRRTNpYuh8MFiIwN4Lm106l09BED14",
-            authDomain: "donation-1b152.firebaseapp.com",
-            projectId: "donation-1b152",
-            storageBucket: "donation-1b152.firebasestorage.app",
-            messagingSenderId: "203853712269",
-            appId: "1:203853712269:web:80441cd834e7b0e68dcbc4",
-            measurementId: "G-10ZKFX0TET"
-        };
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
+  <!-- ================= หน้าเว็บหลัก (Landing Page) ================= -->
+  <div id="view-landing" class="max-w-2xl w-full relative z-10 animate-fade-in-up mt-8 mb-20 flex flex-col items-center text-center">
+    <div class="relative inline-block mb-8 group">
+      <div class="absolute inset-0 bg-pink-400 blur-3xl opacity-40 group-hover:opacity-60 transition-opacity duration-500 rounded-full"></div>
+      <div class="relative inline-flex items-center justify-center w-32 h-32 rounded-full bg-white/90 border-4 border-white shadow-[0_15px_40px_rgba(236,72,153,0.3)] group-hover:border-pink-200 group-hover:-translate-y-3 transition-all duration-300">
+        <i data-lucide="microscope" class="w-16 h-16 text-pink-500 group-hover:text-purple-500 transform group-hover:scale-110 transition-transform duration-300 stroke-[2]"></i>
+      </div>
+    </div>
+    
+    <h1 class="text-5xl md:text-7xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 mb-6 drop-shadow-sm">
+      Bio Space 🧬
+    </h1>
+    
+    <p class="text-purple-800 text-lg md:text-xl font-bold leading-relaxed mb-10 max-w-lg bg-white/50 backdrop-blur-sm p-6 rounded-[2rem] border border-white shadow-sm">
+      ยินดีต้อนรับเหล่าเซลล์น้อยๆ! <br/>
+      <span class="text-pink-600 font-extrabold block mt-2">
+        "มีอะไรฝากบอกครูมั้ย? จะบ่นเรื่องเรียน เม้าท์มอย หรือส่งกำลังใจ พิมพ์มาได้เลยจ้า พร้อมรับฟังจ้า!"
+      </span>
+    </p>
 
-        const DEFAULT_SETTINGS = {
-            systemStatus: 'open', 
-            templeName: 'วัดไชยามาตย์',
-            themeColor: 'orange', 
-            bannerUrl: 'https://images.unsplash.com/photo-1590484501469-808ceea194f4?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80',
-            qrCodeUrl: 'https://img2.pic.in.th/pic/099400240646898.png',
-            marqueeText: 'ขอเชิญร่วมทำบุญตามกำลังศรัทธา สะสมบุญ นำสุขมาให้',
-            requireSlip: true,
-            about: {
-                title: "ประวัติและข้อมูล",
-                heading: "ความร่มเย็นแห่งล้านนา",
-                highlightWord: "ล้านนา",
-                content: "วัดไชยามาตย์ ตั้งอยู่ที่ตำบลเวียงทอง อำเภอสูงเม่น จังหวัดแพร่...",
-                imageUrl: "https://images.unsplash.com/photo-1579548231964-b0a701fccf23?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
-            },
-            passwords: { staff: '104', admin: 'admin104' },
-            bankInfo: { bankName: 'ธ.กรุงไทย', accountName: 'วัดไชยามาตย์', accountNumber: 'xxx-x-xxxxx-x' },
-            contact: { phone: '082-2801992', address: 'หมู่ที่ 1 ตำบลเวียงทอง อำเภอสูงเม่น จังหวัดแพร่ 54130', facebook: '', line: '' },
-            messages: { thankYou: 'ขออนุโมทนาบุญ...' },
-            donationTypes: [
-                { id: 'general', name: 'บริจาคทั่วไป / ค่าน้ำค่าไฟ', hasQuantity: false, price: 0, active: true },
-                { id: 'thai_taan', name: 'ไทยทาน', hasQuantity: true, price: 300, unit: 'ชุด', active: true },
-                { id: 'hua_wat', name: 'หัววัด', hasQuantity: true, price: 500, unit: 'ชุด', active: true },
-                { id: 'roong_taan', name: 'จองโรงทาน', isSpecial: true, active: true } 
-            ]
-        };
+    <button onclick="switchView('form')" class="group relative flex items-center justify-center gap-3 px-10 py-5 bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 hover:from-pink-400 hover:via-purple-400 hover:to-cyan-400 text-white rounded-full font-black text-2xl transition-all duration-300 shadow-[0_10px_30px_rgba(236,72,153,0.4)] hover:shadow-[0_15px_40px_rgba(236,72,153,0.6)] hover:-translate-y-2 overflow-hidden">
+      <span class="absolute inset-0 w-full h-full -mt-1 rounded-lg opacity-30 bg-gradient-to-b from-transparent via-transparent to-black"></span>
+      <span class="relative z-10 flex items-center gap-3">
+        ฝากบอกครู (จิ้มเลย!) 💌
+        <i data-lucide="send" class="w-6 h-6 animate-bounce-x"></i>
+      </span>
+    </button>
+  </div>
 
-        // --- Helpers ---
-        const resizeImage = (file) => new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const img = new Image();
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    const scale = 800 / img.width;
-                    canvas.width = 800;
-                    canvas.height = img.height * scale;
-                    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-                    resolve(canvas.toDataURL('image/jpeg', 0.7));
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
+  <!-- ================= หน้าฟอร์มส่งข้อความ (Form Page) ================= -->
+  <div id="view-form" class="hidden max-w-2xl w-full relative z-10 animate-fade-in-up mt-8 mb-20">
+    <!-- Header ของฟอร์ม -->
+    <div class="mb-6 flex items-center justify-start">
+      <button onclick="switchView('landing')" class="flex items-center gap-2 px-5 py-2.5 bg-white/60 hover:bg-white text-purple-600 rounded-full font-bold transition-all backdrop-blur-sm border border-white shadow-sm hover:shadow-md hover:-translate-x-1">
+        <i data-lucide="arrow-left" class="w-5 h-5"></i> กลับหน้าหลัก
+      </button>
+    </div>
+
+    <div class="text-center mb-10">
+      <div class="relative inline-block mb-6 group">
+        <div class="absolute inset-0 bg-pink-400 blur-2xl opacity-30 group-hover:opacity-50 transition-opacity duration-500 rounded-full"></div>
+        <div class="relative inline-flex items-center justify-center w-24 h-24 rounded-full bg-white border-4 border-white shadow-[0_10px_30px_rgba(236,72,153,0.3)] group-hover:border-pink-200 group-hover:-translate-y-2 transition-all duration-300">
+          <i data-lucide="dna" class="w-12 h-12 text-pink-500 animate-spin-slow group-hover:text-purple-500 stroke-[2]"></i>
+        </div>
+      </div>
+      <h1 class="text-4xl md:text-5xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 mb-4 drop-shadow-sm">
+        มีอะไรฝากบอกครูมั้ย? 💌✨
+      </h1>
+      <div class="bg-white/60 border border-white/80 rounded-[2rem] p-5 backdrop-blur-md inline-block mx-auto transform hover:scale-105 transition-transform duration-300 shadow-sm">
+        <p class="text-purple-800 text-base md:text-lg font-bold leading-relaxed">
+          มีอะไรอยากบอก บ่นเรื่องข้อสอบ หรืออยากอวยครู พิมพ์มาได้เเลยจ้าาา!<br/>
+          <span class="text-pink-500 font-extrabold flex items-center justify-center gap-2 mt-3 bg-pink-50 py-2 px-4 rounded-full border border-pink-100">
+            <i data-lucide="message-square" class="w-4 h-4"></i> 
+            ส่งตรงถึงหครูแน่นอน สบายใจได้เลย 💅
+          </span>
+        </p>
+      </div>
+    </div>
+
+    <!-- ฟอร์มพิมพ์ข้อความ -->
+    <div id="form-container" class="bg-white/50 backdrop-blur-2xl rounded-[2.5rem] p-6 md:p-8 shadow-[0_20px_50px_rgba(147,51,234,0.1)] border border-white group">
+      <form id="message-form">
+        <div class="relative">
+          <textarea id="message-input" placeholder="มีอะไรฝากบอกครู พิมพ์มาโลดดดด บ่นเรื่องเซลล์ เรื่องพืช รับฟังหมดจ้า..." class="w-full bg-white/70 border-2 border-pink-100 focus:border-pink-400 focus:ring-4 focus:ring-pink-400/20 rounded-[2rem] p-6 text-purple-900 text-lg resize-none min-h-[200px] placeholder:text-purple-300 transition-all duration-300 outline-none font-medium backdrop-blur-sm shadow-inner" required></textarea>
+        </div>
+        
+        <button type="submit" id="submit-btn" class="mt-6 w-full flex justify-center items-center gap-3 py-5 rounded-full font-black text-xl transition-all duration-500 overflow-hidden relative bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-500 hover:from-pink-400 hover:via-purple-400 hover:to-cyan-400 text-white shadow-[0_10px_30px_rgba(236,72,153,0.4)] hover:shadow-[0_15px_40px_rgba(236,72,153,0.6)] hover:-translate-y-1 cursor-pointer">
+          <span class="relative z-10" id="btn-text">ส่ง (Send it!) 🚀</span>
+          <i data-lucide="send" id="btn-icon" class="w-6 h-6 relative z-10 animate-bounce-x"></i>
+        </button>
+      </form>
+    </div>
+
+    <!-- แจ้งเตือนส่งสำเร็จ -->
+    <div id="success-container" class="hidden bg-white/80 backdrop-blur-xl rounded-[2.5rem] p-10 text-center shadow-[0_20px_50px_rgba(236,72,153,0.15)] border-2 border-pink-100 animate-scale-in relative overflow-hidden">
+      <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-pink-400 via-purple-400 to-cyan-400"></div>
+      <div class="inline-flex items-center justify-center w-24 h-24 rounded-full bg-gradient-to-tr from-pink-100 to-purple-100 mb-6 border-4 border-white shadow-md animate-bounce">
+        <i data-lucide="sparkles" class="w-12 h-12 text-pink-500"></i>
+      </div>
+      <h2 class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-purple-600 mb-3 tracking-tight">ส่งปุ๊บ ถึงปั๊บ! เริ่ดมากแก 🎉</h2>
+      <p class="text-purple-600 font-bold mb-8 text-lg">ครูได้รับข้อความแล้ว เตรียมตัวรับแรงกระแทกเลยยยย (หยอกๆ) <br/>ขอบคุณที่แชร์กันน้า เลิฟๆ 💖</p>
+      <div class="flex flex-col sm:flex-row gap-4 justify-center">
+        <button onclick="writeAnother()" class="px-8 py-4 bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-400 hover:to-purple-400 text-white rounded-full font-black text-lg transition-all duration-300 shadow-[0_10px_20px_rgba(236,72,153,0.3)] hover:shadow-[0_15px_30px_rgba(236,72,153,0.5)] hover:-translate-y-1">
+          เขียนเม้าท์มอยต่อ ✍️
+        </button>
+        <button onclick="switchView('landing')" class="px-8 py-4 bg-white hover:bg-pink-50 text-pink-500 border-2 border-pink-200 rounded-full font-black text-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
+          กลับหน้าแรก 🏠
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= โหมดคุณครู (Teacher Dashboard) ================= -->
+  <div id="view-admin" class="hidden w-full max-w-6xl mx-auto z-10 relative mt-4 mb-20 animate-fade-in-up">
+    <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 bg-white/60 border border-white p-6 rounded-[2rem] backdrop-blur-xl shadow-[0_10px_40px_rgba(236,72,153,0.1)]">
+      <div class="flex items-center gap-4 mb-4 md:mb-0">
+        <div class="bg-gradient-to-tr from-pink-400 to-purple-400 p-3 rounded-2xl shadow-md">
+          <i data-lucide="microscope" class="w-8 h-8 text-white"></i>
+        </div>
+        <div>
+          <h1 class="text-2xl font-bold tracking-tight text-purple-800">ศูนย์บัญชาการครูชีวะ 🔬✨</h1>
+          <p class="text-sm text-purple-500 font-medium mt-1">กล่องรับข้อความจากเหล่าเซลล์น้อยๆ น่ารักกรุบกริบ</p>
+        </div>
+      </div>
+      <button onclick="logoutAdmin()" class="flex items-center gap-2 px-6 py-2.5 bg-white hover:bg-pink-50 text-pink-500 rounded-full font-bold transition-all duration-300 text-sm border-2 border-pink-200 hover:border-pink-300 hover:shadow-md">
+        <i data-lucide="log-out" class="w-4 h-4"></i>
+        วาร์ปออก
+      </button>
+    </header>
+
+    <div id="messages-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <!-- ข้อความจะถูกเพิ่มที่นี่ผ่าน JavaScript -->
+      <div class="col-span-full flex flex-col items-center justify-center py-32 text-pink-400 border-4 border-dashed border-pink-200 rounded-[2.5rem] bg-white/40 backdrop-blur-sm">
+        <i data-lucide="test-tubes" class="w-20 h-20 mb-4 animate-bounce text-pink-300 stroke-[1.5]"></i>
+        <p class="text-xl font-bold text-purple-500">กำลังเชื่อมต่อห้องแล็บ...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ปุ่มเข้าสู่ระบบครู (Fixed Bottom Right) -->
+  <div class="fixed bottom-6 right-6 z-[100]" id="admin-btn-container">
+    <button onclick="document.getElementById('admin-modal').classList.remove('hidden')" class="flex items-center justify-center p-4 bg-white/90 text-pink-400 hover:text-pink-600 hover:bg-pink-50 border-2 border-pink-200 rounded-full transition-all duration-300 backdrop-blur-md shadow-[0_8px_30px_rgba(236,72,153,0.3)] hover:scale-110 group" title="สำหรับคุณครู">
+      <i data-lucide="lock" class="w-6 h-6 group-hover:animate-pulse stroke-[2.5]"></i>
+    </button>
+  </div>
+
+  <!-- Teacher Login Modal -->
+  <div id="admin-modal" class="hidden fixed inset-0 bg-purple-900/60 backdrop-blur-md flex items-center justify-center z-[200] p-4 animate-fade-in">
+    <div class="bg-white border-4 border-pink-200 rounded-[2.5rem] p-8 max-w-sm w-full shadow-[0_20px_60px_rgba(0,0,0,0.2)] relative animate-scale-in">
+      <button onclick="document.getElementById('admin-modal').classList.add('hidden'); document.getElementById('pin-error').classList.add('hidden');" class="absolute top-6 right-6 text-pink-300 hover:text-pink-600 hover:bg-pink-50 p-2 rounded-full transition-colors">
+        <i data-lucide="x" class="w-6 h-6 stroke-[3]"></i>
+      </button>
+      <div class="mb-8 text-center">
+        <div class="w-20 h-20 rounded-[2rem] bg-gradient-to-tr from-pink-100 to-purple-100 border-4 border-white flex items-center justify-center mx-auto mb-4 shadow-[0_10px_20px_rgba(236,72,153,0.2)]">
+          <i data-lucide="lock" class="w-10 h-10 text-pink-500"></i>
+        </div>
+        <h3 class="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-purple-500 tracking-tight">ครูชีวะมาแล้วจ้า</h3>
+        <p class="text-sm text-purple-500 mt-2 font-bold">ใส่รหัสลับซิส เพื่อเปิดกล่องข้อความ 💖</p>
+      </div>
+      <form id="admin-form">
+        <input type="password" id="pin-input" placeholder="รหัสผ่าน" class="w-full px-4 py-4 rounded-2xl border-2 mb-2 outline-none transition-all text-center text-2xl tracking-[0.5em] font-black bg-pink-50/50 border-pink-200 focus:border-pink-400 focus:ring-4 focus:ring-pink-400/20 text-purple-700" autofocus autocomplete="off">
+        <p id="pin-error" class="hidden text-red-500 text-sm text-center mb-4 font-bold">รหัสผ่านไม่ถูกต้อง ลบแล้วพิมพ์ใหม่จ้า!</p>
+        <button type="submit" class="mt-4 w-full bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-400 hover:to-purple-400 text-white font-black text-lg py-4 rounded-2xl transition-all duration-300 shadow-[0_10px_20px_rgba(236,72,153,0.3)] hover:shadow-[0_15px_30px_rgba(236,72,153,0.5)] hover:-translate-y-1">
+          UNLOCK 🧬
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- เรนเดอร์ไอคอน Lucide -->
+  <script>
+    lucide.createIcons();
+  </script>
+
+  <!-- Firebase Logic (ES Modules) -->
+  <script type="module">
+    // Import Firebase SDKs
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-analytics.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, collection, addDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // Your web app's Firebase configuration
+    const firebaseConfig = {
+      apiKey: "AIzaSyBFTZFIpp8_6QHVsGApr6NZu-MlKYap-Vo",
+      authDomain: "bio-space.firebaseapp.com",
+      projectId: "bio-space",
+      storageBucket: "bio-space.firebasestorage.app",
+      messagingSenderId: "257319111083",
+      appId: "1:257319111083:web:5e540b8d03b5b69d94eaee",
+      measurementId: "G-M3H226F002"
+    };
+
+    // Initialize Firebase
+    const app = initializeApp(firebaseConfig);
+    const analytics = getAnalytics(app);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    // เก็บข้อมูล User 
+    let currentUser = null;
+    let unsubscribeSnapshot = null;
+
+    // ระบบ Login แบบไม่ระบุตัวตน (Anonymous)
+    signInAnonymously(auth).catch((error) => {
+      console.error("Firebase Auth Error:", error.code, error.message);
+      alert("ไม่สามารถเชื่อมต่อระบบได้ กรุณาลองใหม่อีกครั้ง");
+    });
+
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        currentUser = user;
+      }
+    });
+
+    // ---------------- UI Management ----------------
+    
+    // Switch Views
+    window.switchView = function(view) {
+      document.getElementById('view-landing').classList.add('hidden');
+      document.getElementById('view-form').classList.add('hidden');
+      document.getElementById('view-admin').classList.add('hidden');
+      document.getElementById('admin-btn-container').classList.remove('hidden');
+      document.getElementById('floating-icons').classList.remove('hidden');
+      document.getElementById('main-body').className = "min-h-[100dvh] bg-gradient-to-br from-[#FFE4E1] via-[#F0F8FF] to-[#E6E6FA] text-purple-900 flex flex-col items-center justify-center p-4 relative overflow-x-hidden selection:bg-pink-300 selection:text-white transition-colors duration-700";
+
+      if (view === 'landing') {
+        document.getElementById('view-landing').classList.remove('hidden');
+      } else if (view === 'form') {
+        document.getElementById('view-form').classList.remove('hidden');
+        document.getElementById('form-container').classList.remove('hidden');
+        document.getElementById('success-container').classList.add('hidden');
+        document.getElementById('message-input').value = '';
+      } else if (view === 'admin') {
+        document.getElementById('view-admin').classList.remove('hidden');
+        document.getElementById('admin-btn-container').classList.add('hidden');
+        document.getElementById('floating-icons').classList.add('hidden');
+        // เปลี่ยนสีพื้นหลังหน้าแอดมิน
+        document.getElementById('main-body').className = "min-h-[100dvh] bg-gradient-to-br from-fuchsia-50 via-pink-50 to-cyan-50 text-purple-900 p-6 md:p-10 selection:bg-pink-200 overflow-hidden relative transition-colors duration-700";
+        startListeningToMessages();
+      }
+    };
+
+    window.writeAnother = function() {
+      document.getElementById('success-container').classList.add('hidden');
+      document.getElementById('form-container').classList.remove('hidden');
+      document.getElementById('message-input').value = '';
+    }
+
+    // ---------------- Send Message ----------------
+    document.getElementById('message-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const input = document.getElementById('message-input');
+      const text = input.value.trim();
+      const submitBtn = document.getElementById('submit-btn');
+      const btnText = document.getElementById('btn-text');
+      const btnIcon = document.getElementById('btn-icon');
+
+      if (!text || !currentUser) return;
+
+      // Loading state
+      input.disabled = true;
+      submitBtn.disabled = true;
+      btnText.innerHTML = '<span class="animate-pulse">กำลังวาร์ปข้อความ... 🛸</span>';
+      btnIcon.classList.add('hidden');
+      submitBtn.classList.replace('bg-gradient-to-r', 'bg-gray-400');
+
+      try {
+        // ใช้ชื่อ Collection สำหรับเก็บข้อมูลบนฐานข้อมูลของคุณ
+        const messagesRef = collection(db, 'bio_class_secrets');
+        await addDoc(messagesRef, {
+          text: text,
+          createdAt: Date.now(),
+          authorId: currentUser.uid
         });
 
-        // --- UI Components ---
-        const Reveal = ({ children, delay = 0 }) => {
-            const [isVisible, setIsVisible] = useState(false);
-            const ref = useRef(null);
-            useEffect(() => {
-                const observer = new IntersectionObserver(([e]) => { if(e.isIntersecting) setIsVisible(true) }, { threshold: 0.1 });
-                if(ref.current) observer.observe(ref.current);
-                return () => ref.current && observer.unobserve(ref.current);
-            }, []);
-            return <div ref={ref} className={`transition-all duration-1000 transform ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-12'}`} style={{transitionDelay: `${delay}ms`}}>{children}</div>;
-        };
+        // Show Success
+        document.getElementById('form-container').classList.add('hidden');
+        document.getElementById('success-container').classList.remove('hidden');
+      } catch (err) {
+        console.error("Error adding document: ", err);
+        alert("ส่งข้อความไม่สำเร็จ กรุณาลองใหม่น้า");
+      } finally {
+        // Reset state
+        input.disabled = false;
+        submitBtn.disabled = false;
+        btnText.innerHTML = 'ส่งสารเข้าระบบ (Send it!) 🚀';
+        btnIcon.classList.remove('hidden');
+        submitBtn.classList.replace('bg-gray-400', 'bg-gradient-to-r');
+      }
+    });
 
-        const Button = ({ children, variant = 'primary', className = '', ...props }) => {
-            const base = "px-6 py-3 rounded-full font-medium transition-all duration-300 transform active:scale-95 flex items-center justify-center gap-2";
-            const variants = {
-                primary: "bg-gradient-to-r from-primary-600 to-primary-500 text-white shadow-lg hover:shadow-orange-200 hover:-translate-y-1",
-                secondary: "bg-white text-primary-600 border border-primary-100 hover:bg-primary-50 hover:border-primary-200 shadow-sm",
-                glass: "bg-white/20 backdrop-blur-md text-white border border-white/30 hover:bg-white/30",
-                danger: "bg-red-50 text-red-600 hover:bg-red-100",
-                text: "text-gray-500 hover:text-primary-600 bg-transparent"
-            };
-            return <button className={`${base} ${variants[variant]} ${className}`} {...props}>{children}</button>;
-        };
+    // ---------------- Admin Logic ----------------
+    document.getElementById('admin-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const pin = document.getElementById('pin-input').value;
+      
+      if (pin === 'bio') { // รหัสผ่านครูชีวะ
+        document.getElementById('admin-modal').classList.add('hidden');
+        document.getElementById('pin-input').value = '';
+        document.getElementById('pin-error').classList.add('hidden');
+        switchView('admin');
+      } else {
+        const pinInput = document.getElementById('pin-input');
+        pinInput.classList.add('border-red-400', 'text-red-500');
+        document.getElementById('pin-error').classList.remove('hidden');
+      }
+    });
 
-        const Input = ({ label, className = '', ...props }) => (
-            <div className="mb-4">
-                {label && <label className="block text-sm font-medium text-gray-700 mb-1.5 ml-1">{label}</label>}
-                <input className={`w-full px-4 py-3 rounded-xl bg-gray-50 border border-transparent focus:bg-white focus:border-primary-300 focus:ring-4 focus:ring-primary-100 transition-all outline-none ${className}`} {...props} />
+    // ลบสีแดงเวลากลับมาพิมพ์ใหม่
+    document.getElementById('pin-input').addEventListener('input', (e) => {
+      e.target.classList.remove('border-red-400', 'text-red-500');
+      document.getElementById('pin-error').classList.add('hidden');
+    });
+
+    window.logoutAdmin = function() {
+      if(unsubscribeSnapshot) {
+        unsubscribeSnapshot(); // หยุดดึงข้อมูลเมื่อออก
+      }
+      switchView('landing');
+    }
+
+    // ฟังก์ชันจัดรูปแบบเวลา
+    const formatTime = (timestamp) => {
+      if (!timestamp) return '';
+      return new Intl.DateTimeFormat('th-TH', { 
+        day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' 
+      }).format(new Date(timestamp));
+    };
+
+    // ดึงข้อมูล Real-time (ทำงานเฉพาะตอนเปิดหน้าครู)
+    function startListeningToMessages() {
+      const messagesRef = collection(db, 'bio_class_secrets');
+      
+      unsubscribeSnapshot = onSnapshot(messagesRef, (snapshot) => {
+        const fetchedMessages = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        
+        // เรียงจากใหม่ไปเก่า
+        fetchedMessages.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        
+        const grid = document.getElementById('messages-grid');
+        grid.innerHTML = ''; // เคลียร์ของเก่า
+        
+        if (fetchedMessages.length === 0) {
+          grid.innerHTML = `
+            <div class="col-span-full flex flex-col items-center justify-center py-32 text-pink-400 border-4 border-dashed border-pink-200 rounded-[2.5rem] bg-white/40 backdrop-blur-sm">
+              <i data-lucide="test-tubes" class="w-20 h-20 mb-4 animate-bounce text-pink-300 stroke-[1.5]"></i>
+              <p class="text-xl font-bold text-purple-500">ห้องแล็บยังว่าง ไม่มีจดหมายส่งมาเลยจารย์ 🥺</p>
             </div>
-        );
-
-        const Modal = ({ isOpen, onClose, title, children }) => {
-            if (!isOpen) return null;
-            return (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm transition-opacity" onClick={onClose} />
-                    <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl p-6 animate-scale-in">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-2xl font-bold text-gray-800">{title}</h3>
-                            <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><X className="w-5 h-5 text-gray-500" /></button>
-                        </div>
-                        {children}
-                    </div>
+          `;
+        } else {
+          fetchedMessages.forEach(msg => {
+            const time = formatTime(msg.createdAt);
+            const html = `
+              <div class="bg-white/80 border-2 border-pink-100 p-6 rounded-[2rem] hover:bg-white hover:border-pink-300 transition-all duration-500 group flex flex-col hover:-translate-y-2 shadow-sm hover:shadow-[0_15px_30px_rgba(236,72,153,0.15)] relative overflow-hidden backdrop-blur-md">
+                <div class="absolute -right-4 -top-4 opacity-10 group-hover:opacity-20 transition-opacity duration-500">
+                  <i data-lucide="leaf" class="w-24 h-24 text-green-400 transform rotate-45"></i>
                 </div>
-            );
-        };
-
-        // --- Donation Form (Modernized) ---
-        function DonationForm({ userRole, onSave, showNotification, settings }) {
-            const [name, setName] = useState('');
-            const [method, setMethod] = useState((userRole === 'staff' || userRole === 'admin') ? 'เงินสด' : 'เงินโอน');
-            const [generalNote, setGeneralNote] = useState('');
-            const [slipImage, setSlipImage] = useState(null); 
-            const [isUploading, setIsUploading] = useState(false);
-            const [showThankYou, setShowThankYou] = useState(false);
-            const [selectedItems, setSelectedItems] = useState({});
-            
-            // ... (Logic same as previous, omitted for brevity) ...
-            // Re-implementing just the UI structure with modern classes
-            
-            useEffect(() => {
-                const initial = {};
-                (settings.donationTypes || []).forEach(type => { if (type.active) initial[type.id] = { checked: false, quantity: 1, amount: type.price || '' }; });
-                setSelectedItems(initial);
-            }, [settings]);
-
-            const totalAmount = useMemo(() => {
-                let sum = 0;
-                (settings.donationTypes || []).forEach(type => {
-                    if (selectedItems[type.id]?.checked) {
-                        sum += type.hasQuantity ? (selectedItems[type.id].quantity || 1) * type.price : Number(selectedItems[type.id].amount || 0);
-                    }
-                });
-                return sum;
-            }, [selectedItems]);
-
-            const handleSubmit = (e) => {
-                e.preventDefault();
-                // ... validation logic ...
-                 const newDonation = { 
-                    dateTime: new Date().toISOString(), name, 
-                    purpose: "บริจาค (Demo)", // Simplification for demo code
-                    amount: totalAmount, method, generalNote, 
-                    status: userRole === 'donor' ? 'pending' : 'approved', 
-                    slipImage 
-                };
-                onSave(newDonation);
-                if (userRole === 'donor') setShowThankYou(true);
-            };
-
-            const handleFileChange = async (e) => {
-                if(e.target.files[0]) {
-                    setIsUploading(true);
-                    setSlipImage(await resizeImage(e.target.files[0]));
-                    setIsUploading(false);
-                }
-            }
-
-            if (showThankYou) return (
-                <div className="text-center py-12 animate-scale-in">
-                    <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6"><HeartHandshake className="w-12 h-12 text-green-600" /></div>
-                    <h2 className="text-3xl font-bold text-gray-800 mb-4">อนุโมทนาบุญ</h2>
-                    <p className="text-gray-600 mb-8">{settings.messages?.thankYou}</p>
-                    <Button onClick={() => setShowThankYou(false)}>กลับสู่หน้าหลัก</Button>
+                <p class="text-purple-800 leading-relaxed whitespace-pre-wrap text-[16px] flex-grow relative z-10 font-medium">${msg.text.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</p>
+                <div class="mt-6 pt-4 border-t border-pink-100 text-xs text-purple-400 flex justify-between items-center relative z-10 font-bold">
+                  <span class="bg-pink-50 text-pink-500 px-3 py-1.5 rounded-full border border-pink-100">${time}</span>
+                  <span class="opacity-0 group-hover:opacity-100 transition-opacity text-pink-500 flex items-center gap-1">
+                    <i data-lucide="heart-pulse" class="w-5 h-5 animate-pulse"></i>
+                    ความในใจ
+                  </span>
                 </div>
-            );
-
-            return (
-                <div className="max-w-2xl mx-auto">
-                    <div className="bg-white rounded-3xl shadow-soft p-8 animate-fade-up">
-                        <div className="flex items-center gap-3 mb-8 border-b border-gray-100 pb-6">
-                            <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600"><PlusCircle className="w-6 h-6" /></div>
-                            <div>
-                                <h2 className="text-xl font-bold text-gray-800">{userRole === 'donor' ? 'ร่วมทำบุญออนไลน์' : 'บันทึกรับบริจาค'}</h2>
-                                <p className="text-sm text-gray-500">กรอกข้อมูลเพื่อแจ้งความประสงค์</p>
-                            </div>
-                        </div>
-
-                        <form onSubmit={handleSubmit} className="space-y-6">
-                            <Input label="ชื่อ - นามสกุล" placeholder="เช่น นายใจดี มีสุข" value={name} onChange={e => setName(e.target.value)} required />
-                            
-                            <div className="space-y-3">
-                                <label className="block text-sm font-medium text-gray-700 ml-1">เลือกรายการทำบุญ</label>
-                                {(settings.donationTypes || []).map(type => {
-                                    const state = selectedItems[type.id] || {};
-                                    return (
-                                        <div key={type.id} className={`p-4 rounded-2xl border transition-all cursor-pointer ${state.checked ? 'border-primary-500 bg-primary-50/50 shadow-sm' : 'border-gray-200 hover:border-primary-200 hover:bg-gray-50'}`}>
-                                            <div className="flex items-center justify-between">
-                                                <div className="flex items-center gap-3">
-                                                    <input type="checkbox" className="w-5 h-5 rounded text-primary-600 focus:ring-primary-500 border-gray-300" checked={state.checked || false} onChange={e => setSelectedItems({...selectedItems, [type.id]: {...state, checked: e.target.checked}})} />
-                                                    <span className="font-medium text-gray-700">{type.name}</span>
-                                                </div>
-                                                {state.checked && type.hasQuantity && <span className="text-primary-600 font-bold">{state.quantity * type.price}.-</span>}
-                                            </div>
-                                            {state.checked && (
-                                                <div className="mt-4 pl-8 animate-fade-up">
-                                                    {type.hasQuantity ? (
-                                                        <div className="flex items-center gap-3">
-                                                            <button type="button" onClick={() => setSelectedItems({...selectedItems, [type.id]: {...state, quantity: Math.max(1, (state.quantity||1)-1)}})} className="w-8 h-8 rounded-full bg-white border hover:bg-gray-50 flex items-center justify-center text-gray-500">-</button>
-                                                            <span className="font-bold w-8 text-center">{state.quantity || 1}</span>
-                                                            <button type="button" onClick={() => setSelectedItems({...selectedItems, [type.id]: {...state, quantity: (state.quantity||1)+1}})} className="w-8 h-8 rounded-full bg-white border hover:bg-gray-50 flex items-center justify-center text-gray-500">+</button>
-                                                            <span className="text-sm text-gray-500">{type.unit}</span>
-                                                        </div>
-                                                    ) : (
-                                                        <input type="number" placeholder="ระบุจำนวนเงิน" className="w-full p-2 bg-white border rounded-lg" value={state.amount} onChange={e => setSelectedItems({...selectedItems, [type.id]: {...state, amount: e.target.value}})} />
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )
-                                })}
-                            </div>
-
-                            <div className="bg-gray-900 text-white p-6 rounded-2xl flex justify-between items-center shadow-lg">
-                                <span className="text-gray-300">ยอดรวมทั้งสิ้น</span>
-                                <span className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 to-yellow-500">{totalAmount.toLocaleString()} ฿</span>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2 ml-1">ช่องทางการชำระเงิน</label>
-                                <div className="grid grid-cols-3 gap-3">
-                                    {['เงินโอน', 'เงินสด', 'อื่นๆ'].map(m => (
-                                        <button key={m} type="button" onClick={() => setMethod(m)} className={`py-3 rounded-xl text-sm font-medium transition-all ${method === m ? 'bg-primary-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{m}</button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {method === 'เงินโอน' && (
-                                <div className="bg-white border border-gray-200 rounded-2xl p-6 text-center space-y-4">
-                                    <div className="w-48 h-48 bg-white p-2 rounded-xl border mx-auto shadow-sm"><img src={settings.qrCodeUrl} className="w-full h-full object-contain" /></div>
-                                    <div>
-                                        <p className="font-bold text-gray-800 text-lg">{settings.bankInfo?.bankName}</p>
-                                        <p className="text-gray-500">{settings.bankInfo?.accountName}</p>
-                                        <p className="text-2xl font-mono text-primary-600 font-bold mt-2">{settings.bankInfo?.accountNumber}</p>
-                                    </div>
-                                    <label className="block w-full border-2 border-dashed border-gray-300 rounded-xl p-4 hover:border-primary-400 hover:bg-primary-50 transition-colors cursor-pointer group">
-                                        <div className="flex flex-col items-center gap-2">
-                                            {isUploading ? <Loader className="animate-spin text-primary-500" /> : <UploadCloud className="text-gray-400 group-hover:text-primary-500" />}
-                                            <span className="text-sm text-gray-500 group-hover:text-primary-600">{slipImage ? 'เปลี่ยนรูปสลิป' : 'แตะเพื่อแนบสลิป'}</span>
-                                        </div>
-                                        <input type="file" className="hidden" accept="image/*" onChange={handleFileChange} />
-                                    </label>
-                                    {slipImage && <img src={slipImage} className="h-32 mx-auto rounded-lg border" />}
-                                </div>
-                            )}
-
-                            <Input label="หมายเหตุ (ถ้ามี)" placeholder="คำอวยพร หรือ รายละเอียดเพิ่มเติม" value={generalNote} onChange={e => setGeneralNote(e.target.value)} />
-
-                            <Button type="submit" className="w-full py-4 text-lg" disabled={isUploading}>
-                                {isUploading ? 'กำลังประมวลผล...' : 'ยืนยันการทำบุญ'}
-                            </Button>
-                        </form>
-                    </div>
-                </div>
-            );
+              </div>
+            `;
+            grid.innerHTML += html;
+          });
         }
+        
+        // เรนเดอร์ไอคอนใหม่หลังจากแทรก HTML
+        lucide.createIcons();
+      }, (error) => {
+        console.error("Error fetching messages: ", error);
+        document.getElementById('messages-grid').innerHTML = `
+          <div class="col-span-full text-center py-10 text-red-500 font-bold">
+            เกิดข้อผิดพลาดในการดึงข้อมูล กรุณาตรวจสอบการตั้งค่า Firebase Rules
+          </div>
+        `;
+      });
+    }
 
-        // --- Landing Page ---
-        function OfficialWebsite({ onNavigate, donations, settings }) {
-            const [scrolled, setScrolled] = useState(false);
-            const [selectedNews, setSelectedNews] = useState(null);
-
-            useEffect(() => {
-                const handler = () => setScrolled(window.scrollY > 20);
-                window.addEventListener('scroll', handler);
-                return () => window.removeEventListener('scroll', handler);
-            }, []);
-
-            const totalAmount = useMemo(() => donations.reduce((sum, d) => sum + (Number(d.amount)||0), 0), [donations]);
-
-            return (
-                <div className="min-h-screen bg-gray-50">
-                    {/* Navbar */}
-                    <nav className={`fixed top-0 inset-x-0 z-40 transition-all duration-300 ${scrolled ? 'bg-white/80 backdrop-blur-md shadow-sm py-3' : 'bg-transparent py-6'}`}>
-                        <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
-                            <div className="flex items-center gap-3">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${scrolled ? 'bg-primary-600 text-white' : 'bg-white text-primary-600 shadow-lg'}`}>
-                                    <BookOpen size={20} />
-                                </div>
-                                <span className={`text-xl font-bold tracking-tight ${scrolled ? 'text-gray-800' : 'text-white'}`}>{settings.templeName}</span>
-                            </div>
-                            <div className="hidden md:flex items-center gap-8">
-                                {['หน้าหลัก', 'ประวัติวัด', 'ข่าวสาร', 'ติดต่อ'].map((item) => (
-                                    <a key={item} href={`#${item}`} className={`text-sm font-medium hover:text-primary-500 transition-colors ${scrolled ? 'text-gray-600' : 'text-white/90'}`}>{item}</a>
-                                ))}
-                                <Button onClick={() => onNavigate('donate-system')} className={!scrolled ? "bg-white text-primary-600 hover:bg-gray-100" : ""}>ร่วมทำบุญ</Button>
-                            </div>
-                        </div>
-                    </nav>
-
-                    {/* Hero Section */}
-                    <header id="หน้าหลัก" className="relative h-screen flex items-center justify-center overflow-hidden">
-                        <div className="absolute inset-0 z-0">
-                            <img src={settings.bannerUrl} className="w-full h-full object-cover animate-scale-in" style={{animationDuration: '10s'}} />
-                            <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-gray-50"></div>
-                        </div>
-                        <div className="relative z-10 text-center px-4 max-w-5xl mx-auto mt-20">
-                            <div className="inline-block px-4 py-1.5 rounded-full border border-white/30 bg-white/10 backdrop-blur-sm text-white/90 text-sm font-medium mb-6 animate-fade-up">
-                                ยินดีต้อนรับสู่ดินแดนแห่งความสงบ
-                            </div>
-                            <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 leading-tight drop-shadow-lg animate-fade-up" style={{animationDelay: '0.1s'}}>
-                                {settings.templeName}
-                            </h1>
-                            <p className="text-lg md:text-2xl text-white/80 mb-10 font-light animate-fade-up" style={{animationDelay: '0.2s'}}>
-                                ศูนย์รวมจิตใจ ศิลปะวัฒนธรรมล้านนา และความศรัทธา
-                            </p>
-                            
-                            <div className="flex flex-col sm:flex-row gap-4 justify-center animate-fade-up" style={{animationDelay: '0.3s'}}>
-                                <Button onClick={() => onNavigate('donate-system')} className="px-8 py-4 text-lg shadow-glow">
-                                    <HeartHandshake className="w-5 h-5" /> ร่วมทำบุญออนไลน์
-                                </Button>
-                                <Button variant="glass" className="px-8 py-4 text-lg">
-                                    <CalendarDays className="w-5 h-5" /> กิจกรรมเร็วๆ นี้
-                                </Button>
-                            </div>
-
-                            {/* Stats Card */}
-                            <div className="mt-16 animate-float">
-                                <div className="glass-dark inline-block rounded-2xl p-6 px-10 shadow-2xl">
-                                    <p className="text-gray-400 text-sm uppercase tracking-wider mb-1">ยอดบริจาครวมทั้งหมด</p>
-                                    <div className="text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 via-yellow-400 to-yellow-200">
-                                        ฿ {totalAmount.toLocaleString()}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </header>
-
-                    {/* About Section */}
-                    <section id="ประวัติวัด" className="py-24 px-6 relative overflow-hidden">
-                        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
-                            <Reveal>
-                                <div className="relative group">
-                                    <div className="absolute inset-0 bg-gradient-to-br from-primary-200 to-transparent rounded-[2rem] transform rotate-3 scale-105 opacity-50 group-hover:rotate-2 transition-all"></div>
-                                    <img src={settings.about.imageUrl} className="relative rounded-[2rem] shadow-2xl w-full h-[500px] object-cover transition-transform duration-700 group-hover:scale-[1.01]" />
-                                </div>
-                            </Reveal>
-                            <Reveal delay={200}>
-                                <div>
-                                    <div className="flex items-center gap-2 text-primary-600 font-bold mb-4 uppercase tracking-widest text-sm">
-                                        <div className="w-8 h-[2px] bg-primary-600"></div> ประวัติความเป็นมา
-                                    </div>
-                                    <h2 className="text-4xl font-bold text-gray-900 mb-6 leading-tight">
-                                        {settings.about.heading.split(settings.about.highlightWord).map((part, i) => (
-                                            <span key={i}>{part}{i < 1 && <span className="text-gradient">{settings.about.highlightWord}</span>}</span>
-                                        ))}
-                                    </h2>
-                                    <p className="text-gray-600 text-lg leading-relaxed mb-8">
-                                        {settings.about.content}
-                                    </p>
-                                    <div className="grid grid-cols-2 gap-6 mb-8">
-                                        <div className="p-4 bg-white rounded-2xl shadow-sm border border-gray-100">
-                                            <Star className="w-8 h-8 text-yellow-500 mb-2" />
-                                            <div className="font-bold text-xl">100+ ปี</div>
-                                            <div className="text-sm text-gray-500">ความเก่าแก่</div>
-                                        </div>
-                                        <div className="p-4 bg-white rounded-2xl shadow-sm border border-gray-100">
-                                            <User className="w-8 h-8 text-primary-500 mb-2" />
-                                            <div className="font-bold text-xl">ชุมชน</div>
-                                            <div className="text-sm text-gray-500">ศูนย์รวมจิตใจ</div>
-                                        </div>
-                                    </div>
-                                    <Button variant="secondary">อ่านประวัติเพิ่มเติม <ArrowRight className="w-4 h-4" /></Button>
-                                </div>
-                            </Reveal>
-                        </div>
-                    </section>
-
-                    {/* Marquee */}
-                    <div className="bg-primary-900 text-white/90 py-4 overflow-hidden">
-                        <div className="animate-marquee whitespace-nowrap text-lg font-light tracking-wide">
-                            {settings.marqueeText} • ร่วมสืบสานวัฒนธรรมล้านนา • ทำบุญออนไลน์ได้ตลอด 24 ชั่วโมง • {settings.marqueeText}
-                        </div>
-                    </div>
-
-                    {/* Footer */}
-                    <footer className="bg-white border-t border-gray-100 pt-16 pb-8">
-                        <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
-                            <div className="col-span-1 md:col-span-2">
-                                <div className="flex items-center gap-3 mb-6">
-                                    <div className="w-10 h-10 bg-primary-600 rounded-full flex items-center justify-center text-white"><BookOpen size={20} /></div>
-                                    <span className="text-xl font-bold">{settings.templeName}</span>
-                                </div>
-                                <p className="text-gray-500 leading-relaxed max-w-sm">
-                                    มรดกทางวัฒนธรรมและความศรัทธา ที่อยู่คู่ชุมชนมาอย่างยาวนาน ขอเชิญร่วมเป็นส่วนหนึ่งในการทำนุบำรุงพระพุทธศาสนา
-                                </p>
-                            </div>
-                            <div>
-                                <h4 className="font-bold text-gray-900 mb-6">เมนูนำทาง</h4>
-                                <ul className="space-y-3 text-gray-500">
-                                    {['หน้าหลัก', 'บริจาคออนไลน์', 'ตรวจสอบยอด', 'ติดต่อเรา'].map(m => <li key={m}><a href="#" className="hover:text-primary-600 transition-colors">{m}</a></li>)}
-                                </ul>
-                            </div>
-                            <div>
-                                <h4 className="font-bold text-gray-900 mb-6">ติดต่อเรา</h4>
-                                <ul className="space-y-4 text-gray-500">
-                                    <li className="flex items-start gap-3"><MapPin className="w-5 h-5 text-primary-600 shrink-0" /> {settings.contact.address}</li>
-                                    <li className="flex items-center gap-3"><Phone className="w-5 h-5 text-primary-600" /> {settings.contact.phone}</li>
-                                </ul>
-                            </div>
-                        </div>
-                        <div className="max-w-7xl mx-auto px-6 pt-8 border-t border-gray-100 text-center text-gray-400 text-sm">
-                            &copy; {new Date().getFullYear()} {settings.templeName}. All rights reserved. Design with <span className="text-red-400">❤</span> for Buddhism.
-                        </div>
-                    </footer>
-                </div>
-            );
-        }
-
-        // --- Main App Shell ---
-        function App() {
-            const [page, setPage] = useState('landing'); // 'landing' or 'app'
-            const [donations, setDonations] = useState([]);
-            const [settings, setSettings] = useState(DEFAULT_SETTINGS);
-            const [user, setUser] = useState(null);
-
-            useEffect(() => {
-                signInAnonymously(auth).then(() => {
-                    const unsubAuth = onAuthStateChanged(auth, u => {
-                        setUser(u);
-                        if(u) {
-                             const unsubDonations = onSnapshot(query(collection(db, 'donations')), s => setDonations(s.docs.map(d => ({id: d.id, ...d.data()}))));
-                             const unsubSettings = onSnapshot(doc(db, 'settings', 'config'), s => s.exists() && setSettings({...DEFAULT_SETTINGS, ...s.data()}));
-                             return () => { unsubDonations(); unsubSettings(); }
-                        }
-                    });
-                });
-            }, []);
-
-            const handleSaveDonation = async (d) => { await addDoc(collection(db, 'donations'), d); alert('บันทึกเรียบร้อย'); };
-            const handleUpdateSettings = async (s) => { await setDoc(doc(db, 'settings', 'config'), s); alert('บันทึกตั้งค่าแล้ว'); };
-
-            if (page === 'landing') return <OfficialWebsite settings={settings} donations={donations} onNavigate={() => setPage('app')} />;
-
-            // Simple switch for demo purposes between Landing and System
-            return (
-                <div className="min-h-screen bg-gray-50 pb-20">
-                     <nav className="bg-white border-b px-6 py-4 flex justify-between items-center sticky top-0 z-30">
-                        <div className="flex items-center gap-3">
-                            <button onClick={() => setPage('landing')} className="p-2 hover:bg-gray-100 rounded-full"><ArrowLeft /></button>
-                            <h1 className="font-bold text-lg">ระบบจัดการ</h1>
-                        </div>
-                        <div className="flex gap-2">
-                            <span className="px-3 py-1 bg-gray-100 rounded-full text-xs font-medium text-gray-500 flex items-center gap-2"><Lock size={12}/> Guest Mode</span>
-                        </div>
-                     </nav>
-                     <div className="p-6">
-                        <DonationForm userRole="donor" settings={settings} onSave={handleSaveDonation} />
-                        {/* Note: Other panels (Dashboard/Admin) are omitted in this specific "Modern UI" rewrite to focus on the Visuals of the main user journey. 
-                            You can copy the logic from the previous artifact into this structure if needed. */}
-                     </div>
-                </div>
-            );
-        }
-
-        const root = createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
+  </script>
 </body>
 </html>
